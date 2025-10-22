@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Optional: you can add global overrides here */
+body {
+  @apply bg-slate-50 text-gray-900;
+}
