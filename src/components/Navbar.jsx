@@ -6,12 +6,13 @@ export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation(); // current URL
 
-  const links = [
-    { path: "/", label: "Home" },
-    { path: "/login", label: "Login" },
-    { path: "/register", label: "Register" },
-    { path: "/contact", label: "Contact" }, // new contact page
-  ];
+  // Only show Dashboard and Profile links on /admin page
+  const links = location.pathname === "/admin"
+    ? [
+        { path: "/dashboard", label: "Dashboard" },
+        { path: "/profile", label: "Profile" },
+      ]
+    : [];
 
   return (
     <nav className="bg-gradient-to-r from-gray-800 to-sky-800 text-white shadow-md">
@@ -31,20 +32,22 @@ export default function Navbar() {
         </div>
 
         {/* Mobile Menu Button */}
-        <button
-          className="md:hidden text-2xl focus:outline-none"
-          onClick={() => setIsOpen(!isOpen)}
-        >
-          {isOpen ? <FaTimes /> : <FaBars />}
-        </button>
+        {links.length > 0 && (
+          <button
+            className="md:hidden text-2xl focus:outline-none"
+            onClick={() => setIsOpen(!isOpen)}
+          >
+            {isOpen ? <FaTimes /> : <FaBars />}
+          </button>
+        )}
       </div>
 
       {/* Mobile Menu */}
-      {isOpen && (
+      {isOpen && links.length > 0 && (
         <div className="md:hidden flex flex-col bg-gray-800 text-white px-4 py-3 space-y-2">
           {links.map(
             (link) =>
-              link.path !== location.pathname && ( // hide current page
+              link.path !== location.pathname && (
                 <Link
                   key={link.path}
                   to={link.path}

@@ -15,6 +15,7 @@ import User from "./pages/User";
 import Sales from "./pages/Sales";
 import Purchase from "./pages/Purchase";
 import Profile from "./pages/Profile";
+import Admin from "./pages/Admin";
 
 function App() {
   return (
@@ -26,6 +27,8 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/admin" element={<Admin />} />
+
 
         </Route>
 
@@ -42,6 +45,7 @@ function App() {
 <Route path="/management/user" element={<User />} />
 
 <Route path="/profile" element={<Profile />} />
+
 
 
 

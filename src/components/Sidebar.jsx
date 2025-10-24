@@ -44,10 +44,10 @@ export default function Sidebar() {
       </button>
 
       {/* Sidebar */}
-      <aside
-        className={`fixed md:static top-0 left-0 h-screen w-64 bg-gradient-to-b from-zinc-900 to-cyan-800 text-white shadow-lg flex flex-col justify-between transform transition-transform duration-300 z-40
-        ${isOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}
-      >
+   <aside
+  className={`fixed md:static top-0 left-0 h-screen md:h-auto min-h-full w-64 bg-gradient-to-b from-zinc-900 to-cyan-800 text-white shadow-lg flex flex-col justify-between overflow-hidden transform transition-transform duration-300 z-40
+  ${isOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}
+>
         {/* Sidebar Scrollable Area */}
         <div className="flex-1 overflow-y-auto">
           {/* Sidebar Header */}
