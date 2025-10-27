@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const API_BASE_URL = "http://127.0.0.1:8000/api";
@@ -10,7 +10,6 @@ const Products = () => {
   const [allProductsCurrentPage, setAllProductsCurrentPage] = useState(1);
   const [unitsCurrentPage, setUnitsCurrentPage] = useState(1);
   const [showAddProductPopup, setShowAddProductPopup] = useState(false);
-  const [showEditProductPopup, setShowEditProductPopup] = useState(false);
   const [showAddCategoryPopup, setShowAddCategoryPopup] = useState(false);
   const [showAddUnitPopup, setShowAddUnitPopup] = useState(false);
   const [showUnitSection, setShowUnitSection] = useState(false);
@@ -18,7 +17,8 @@ const Products = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [unitSearchTerm, setUnitSearchTerm] = useState('');
-  const [editProductData, setEditProductData] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
   const [isDataFetched, setIsDataFetched] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const itemsPerPage = 50;
@@ -28,13 +28,8 @@ const Products = () => {
   const user = useMemo(() => {
     const stored = localStorage.getItem('user');
     if (!stored) return {};
-    try {
-      return JSON.parse(stored);
-    } catch (error) {
-      console.error('Failed to parse user from localStorage:', error);
-      localStorage.removeItem('user');
-      return {};
-    }
+    try { return JSON.parse(stored); }
+    catch { localStorage.removeItem('user'); return {}; }
   }, []);
 
   const authToken = useMemo(() => localStorage.getItem('authToken') || null, []);
@@ -50,9 +45,7 @@ const Products = () => {
   // Toast Notification
   const showToast = (message, isError = false) => {
     const toast = document.createElement('div');
-    toast.className = `fixed top-5 right-5 p-4 rounded shadow-lg z-50 ${
-      isError ? 'bg-red-500' : 'bg-cyan-800'
-    } text-white text-sm sm:text-base`;
+    toast.className = `fixed top-5 right-5 p-4 rounded shadow-lg z-50 text-sm sm:text-base ${isError ? 'bg-red-500' : 'bg-cyan-800'} text-white`;
     toast.textContent = message;
     document.body.appendChild(toast);
     setTimeout(() => {
@@ -134,6 +127,8 @@ const Products = () => {
         primary_unit: product.primary_unit ? product.primary_unit.replace(/,$/, '') : 'N/A',
         secondary_unit: product.secondary_unit ? product.secondary_unit.replace(/,$/, '') : 'N/A',
         c_factor: product.c_factor || 'N/A',
+        p_unit_id: product.p_unit,
+        s_unit_id: product.s_unit,
       })).sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
       setAllProducts(sortedProducts);
       if (sortedProducts.length === 0) {
@@ -202,59 +197,62 @@ const Products = () => {
   };
 
   // Filter Products
-  const filterProducts = (products, term, catId) => {
-    return products
+  const filteredProducts = useMemo(() => {
+    return allProducts
       .filter(product => {
         const matchesSearch =
-          product.display_name.toLowerCase().includes(term.toLowerCase()) ||
-          product.category.toLowerCase().includes(term.toLowerCase()) ||
-          product.display_hscode.toLowerCase().includes(term.toLowerCase()) ||
-          product.description.toLowerCase().includes(term.toLowerCase());
-        const matchesCategory = !catId || String(product.category_id) === String(catId);
+          product.display_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          product.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          product.display_hscode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          product.description.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesCategory = !categoryFilter || String(product.category_id) === String(categoryFilter);
         return matchesSearch && matchesCategory;
       })
       .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
-  };
+  }, [allProducts, searchTerm, categoryFilter]);
 
   // Filter Units
-  const filterUnits = (units, term) => {
+  const filteredUnits = useMemo(() => {
     return units
-      .filter(unit => unit.name.toLowerCase().includes(term.toLowerCase()))
+      .filter(unit => unit.name.toLowerCase().includes(unitSearchTerm.toLowerCase()))
       .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+  }, [units, unitSearchTerm]);
+
+  // Pagination
+  const paginate = (items, page) => {
+    const start = (page - 1) * itemsPerPage;
+    return items.slice(start, start + itemsPerPage);
   };
 
-  // Pagination Setup
-  const setupPagination = (totalItems, currentPage, type) => {
-    const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const Pagination = ({ total, page, type }) => {
+    const totalPages = Math.ceil(total / itemsPerPage);
     const maxPagesToShow = 5;
-    let startPage = Math.max(1, currentPage - 2);
+    let startPage = Math.max(1, page - 2);
     let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
     if (endPage < startPage + maxPagesToShow - 1) {
       startPage = Math.max(1, endPage - maxPagesToShow + 1);
     }
 
     const pages = [];
-    for (let i = startPage; i <= endPage; i++) {
-      pages.push(i);
-    }
+    for (let i = startPage; i <= endPage; i++) pages.push(i);
 
     return (
       <div className="flex items-center justify-center space-x-2 mt-4">
         <button
           className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50 text-sm sm:text-base"
-          disabled={currentPage === 1 || totalItems === 0}
-          onClick={() => type === 'products' ? setAllProductsCurrentPage(currentPage - 1) : setUnitsCurrentPage(currentPage - 1)}
+          disabled={page === 1 || total === 0}
+          onClick={() => type === 'products' ? setAllProductsCurrentPage(page - 1) : setUnitsCurrentPage(page - 1)}
         >
           Previous
         </button>
-        {totalItems > 0 ? (
-          pages.map(page => (
+        {total > 0 ? (
+          pages.map(p => (
             <button
-              key={page}
-              className={`px-3 py-1 rounded ${page === currentPage ? 'bg-cyan-800 text-white' : 'bg-gray-200'} text-sm sm:text-base`}
-              onClick={() => type === 'products' ? setAllProductsCurrentPage(page) : setUnitsCurrentPage(page)}
+              key={p}
+              className={`px-3 py-1 rounded ${p === page ? 'bg-cyan-800 text-white' : 'bg-gray-200'} text-sm sm:text-base`}
+              onClick={() => type === 'products' ? setAllProductsCurrentPage(p) : setUnitsCurrentPage(p)}
             >
-              {page}
+              {p}
             </button>
           ))
         ) : (
@@ -262,56 +260,228 @@ const Products = () => {
         )}
         <button
           className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50 text-sm sm:text-base"
-          disabled={currentPage === totalPages || totalItems === 0}
-          onClick={() => type === 'products' ? setAllProductsCurrentPage(currentPage + 1) : setUnitsCurrentPage(currentPage + 1)}
+          disabled={page === totalPages || total === 0}
+          onClick={() => type === 'products' ? setAllProductsCurrentPage(page + 1) : setUnitsCurrentPage(page + 1)}
         >
           Next
         </button>
-        <span className="text-sm sm:text-base">{totalItems} total</span>
+        <span className="text-sm sm:text-base">{total} total</span>
       </div>
     );
   };
 
+  // Start Editing
+  const startEdit = (product) => {
+    setEditingId(product.id);
+    setEditForm({
+      name: product.display_name || '',
+      category_id: product.category_id || '',
+      hscode: product.display_hscode || '',
+      p_unit: product.p_unit_id || '',
+      s_unit: product.s_unit_id || '',
+      c_factor: product.c_factor === 'N/A' ? '' : product.c_factor,
+      description: product.description || '',
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditForm({});
+  };
+
+  // Save Edit
+  const saveEdit = async () => {
+    if (!editingId) return;
+
+    const payload = {
+      name: editForm.name?.trim(),
+      category_id: parseInt(editForm.category_id, 10),
+      hscode: editForm.hscode?.trim() || null,
+      p_unit: editForm.p_unit ? parseInt(editForm.p_unit, 10) : null,
+      s_unit: editForm.s_unit ? parseInt(editForm.s_unit, 10) : null,
+      c_factor: editForm.c_factor ? parseFloat(editForm.c_factor) : null,
+      description: editForm.description?.trim() || null,
+    };
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/products/${editingId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      const responseText = await response.text();
+      if (response.ok) {
+        showToast('Product updated successfully!');
+        const updatedProduct = JSON.parse(responseText).product;
+        setAllProducts(prev =>
+          prev.map(p =>
+            p.id === editingId
+              ? {
+                  ...p,
+                  name: updatedProduct.name,
+                  category_id: updatedProduct.category_id,
+                  category: categories.find(cat => cat.id === updatedProduct.category_id)?.name || 'N/A',
+                  hscode: updatedProduct.hscode,
+                  description: updatedProduct.description || 'N/A',
+                  primary_unit: units.find(unit => unit.id === updatedProduct.p_unit)?.name || 'N/A',
+                  secondary_unit: units.find(unit => unit.id === updatedProduct.s_unit)?.name || 'N/A',
+                  c_factor: updatedProduct.c_factor || 'N/A',
+                  display_name: updatedProduct.name || 'N/A',
+                  display_hscode: updatedProduct.hscode || 'N/A',
+                  p_unit_id: updatedProduct.p_unit,
+                  s_unit_id: updatedProduct.s_unit,
+                }
+              : p
+          ).sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()))
+        );
+        cancelEdit();
+      } else {
+        let errorMessage = 'Couldn’t update the product.';
+        try {
+          const errorData = JSON.parse(responseText);
+          if (errorData.errors) {
+            const messages = Object.entries(errorData.errors).flatMap(([field, errs]) =>
+              errs.map(err => `${field}: ${err}`)
+            );
+            errorMessage = messages.join('; ');
+          } else if (errorData.message) {
+            errorMessage = errorData.message;
+          } else {
+            errorMessage = responseText;
+          }
+        } catch (e) {
+          errorMessage = responseText || 'Unknown server error.';
+        }
+        showToast(`Failed to update product: ${errorMessage}`, true);
+      }
+    } catch (error) {
+      showToast(`Couldn’t update product: ${error.message}`, true);
+    }
+  };
+
   // Display Products
   const displayProducts = () => {
-    const filteredProducts = filterProducts(allProducts, searchTerm, categoryFilter);
-    const startIndex = (allProductsCurrentPage - 1) * itemsPerPage;
-    const paginatedProducts = filteredProducts.slice(startIndex, Math.min(startIndex + itemsPerPage, filteredProducts.length));
+    const paginatedProducts = paginate(filteredProducts, allProductsCurrentPage);
     const showActions = user && user.rid <= 7;
 
     if (isMobile) {
       return (
         <div className="space-y-4">
           {paginatedProducts.length === 0 ? (
-            <div className="text-center py-6 text-sm text-gray-600">
+            <div className="text-center py-6 text-sm text-cyan-700">
               {filteredProducts.length > 0 ? 'No products on this page' : 'No products available'}
             </div>
           ) : (
-            paginatedProducts.map((product, index) => (
-              <div key={product.id} className="bg-white border rounded-lg p-4 shadow-sm flex flex-col gap-2 text-sm">
-                <div className="flex justify-between items-start">
-                  <div className="font-semibold text-base">
-                    {startIndex + index + 1}. {product.display_name || 'N/A'}
-                  </div>
-                  {showActions && (
-                    <button
-                      className="px-2 py-1 bg-cyan-800 text-white rounded text-xs hover:bg-red-500"
-                      onClick={() => editProduct(product.id)}
-                    >
-                      Edit
-                    </button>
+            paginatedProducts.map((product, index) => {
+              const isEditing = editingId === product.id;
+              const idx = (allProductsCurrentPage - 1) * itemsPerPage + index + 1;
+
+              return (
+                <div key={product.id} className="bg-white border rounded-lg p-4 shadow-sm">
+                  {isEditing ? (
+                    <div className="space-y-3">
+                      <input
+                        type="text"
+                        className="w-full border rounded px-2 py-1 text-sm"
+                        value={editForm.name || ''}
+                        onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                        placeholder="Product Name *"
+                        required
+                      />
+                      <select
+                        className="w-full border rounded px-2 py-1 text-sm"
+                        value={editForm.category_id || ''}
+                        onChange={e => setEditForm({ ...editForm, category_id: e.target.value })}
+                      >
+                        <option value="" disabled>Select Category</option>
+                        {categories.map(category => (
+                          <option key={category.id} value={category.id}>{category.name}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="text"
+                        className="w-full border rounded px-2 py-1 text-sm"
+                        value={editForm.hscode || ''}
+                        onChange={e => setEditForm({ ...editForm, hscode: e.target.value })}
+                        placeholder="HSCODE"
+                      />
+                      <select
+                        className="w-full border rounded px-2 py-1 text-sm"
+                        value={editForm.p_unit || ''}
+                        onChange={e => {
+                          setEditForm({ ...editForm, p_unit: e.target.value });
+                          showUnitConversionPopup(units.find(u => u.id == e.target.value));
+                        }}
+                      >
+                        <option value="" disabled>Select Primary Unit</option>
+                        {units.map(unit => (
+                          <option key={unit.id} value={unit.id}>{unit.name}</option>
+                        ))}
+                      </select>
+                      <select
+                        className="w-full border rounded px-2 py-1 text-sm"
+                        value={editForm.s_unit || ''}
+                        onChange={e => {
+                          setEditForm({ ...editForm, s_unit: e.target.value });
+                          showUnitConversionPopup(units.find(u => u.id == e.target.value));
+                        }}
+                      >
+                        <option value="" disabled>Select Secondary Unit</option>
+                        {units.map(unit => (
+                          <option key={unit.id} value={unit.id}>{unit.name}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="number"
+                        step="any"
+                        className="w-full border rounded px-2 py-1 text-sm"
+                        value={editForm.c_factor || ''}
+                        onChange={e => setEditForm({ ...editForm, c_factor: e.target.value })}
+                        placeholder="Conversion Factor"
+                      />
+                      <input
+                        type="text"
+                        className="w-full border rounded px-2 py-1 text-sm"
+                        value={editForm.description || ''}
+                        onChange={e => setEditForm({ ...editForm, description: e.target.value })}
+                        placeholder="Description"
+                      />
+                      <div className="flex space-x-2">
+                        <button className="flex-1 px-3 py-1 bg-cyan-700 text-white rounded text-sm" onClick={saveEdit}>Save</button>
+                        <button className="flex-1 px-3 py-1 bg-gray-500 text-white rounded text-sm" onClick={cancelEdit}>Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2 text-sm">
+                      <div className="flex justify-between items-start">
+                        <div className="font-semibold text-base">
+                          {idx}. {product.display_name || 'N/A'}
+                        </div>
+                        {showActions && (
+                          <button
+                            className="px-2 py-1 bg-cyan-800 text-white rounded text-xs hover:bg-red-500"
+                            onClick={() => startEdit(product)}
+                          >
+                            Edit
+                          </button>
+                        )}
+                      </div>
+                      <div><strong>Category:</strong> {product.category || 'N/A'}</div>
+                      <div><strong>HScode:</strong> {product.display_hscode || 'N/A'}</div>
+                      <div><strong>P. Unit:</strong> {product.primary_unit || 'N/A'}</div>
+                      <div><strong>S. Unit:</strong> {product.secondary_unit || 'N/A'}</div>
+                      <div><strong>CF:</strong> {product.c_factor || 'N/A'}</div>
+                      <div><strong>Description :</strong> {product.description || 'N/A'}</div>
+                    </div>
                   )}
                 </div>
-                <div><strong>Category:</strong> {product.category || 'N/A'}</div>
-                <div><strong>HScode:</strong> {product.display_hscode || 'N/A'}</div>
-                <div><strong>P. Unit:</strong> {product.primary_unit || 'N/A'}</div>
-                <div><strong>S. Unit:</strong> {product.secondary_unit || 'N/A'}</div>
-                <div><strong>CF:</strong> {product.c_factor || 'N/A'}</div>
-                <div><strong>Description:</strong> {product.description || 'N/A'}</div>
-              </div>
-            ))
+              );
+            })
           )}
-          {setupPagination(filteredProducts.length, allProductsCurrentPage, 'products')}
+          <Pagination total={filteredProducts.length} page={allProductsCurrentPage} type="products" />
         </div>
       );
     }
@@ -340,41 +510,143 @@ const Products = () => {
                 </td>
               </tr>
             ) : (
-              paginatedProducts.map((product, index) => (
-                <tr key={product.id}>
-                  <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">{startIndex + index + 1}</td>
-                  <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">{product.display_name || 'N/A'}</td>
-                  <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">{product.category || 'N/A'}</td>
-                  <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">{product.display_hscode || 'N/A'}</td>
-                  <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">{product.primary_unit || 'N/A'}</td>
-                  <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">{product.secondary_unit || 'N/A'}</td>
-                  <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">{product.c_factor || 'N/A'}</td>
-                  <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">{product.description || 'N/A'}</td>
-                  {showActions && (
-                    <td className="py-2 px-3 sm:px-4 border">
-                      <button
-                        className="px-2 py-1 bg-cyan-800 text-white rounded text-sm sm:text-base"
-                        onClick={() => editProduct(product.id)}
-                      >
-                        Edit
-                      </button>
-                    </td>
-                  )}
-                </tr>
-              ))
+              paginatedProducts.map((product, index) => {
+                const isEditing = editingId === product.id;
+                const idx = (allProductsCurrentPage - 1) * itemsPerPage + index + 1;
+
+                return (
+                  <tr key={product.id}>
+                    <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">{idx}</td>
+
+                    {isEditing ? (
+                      <>
+                        <td className="py-2 px-3 sm:px-4 border">
+                          <input
+                            type="text"
+                            className="w-full border rounded px-2 py-1 text-sm sm:text-base"
+                            value={editForm.name || ''}
+                            onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                            required
+                          />
+                        </td>
+                        <td className="py-2 px-3 sm:px-4 border">
+                          <select
+                            className="w-full border rounded px-2 py-1 text-sm sm:text-base"
+                            value={editForm.category_id || ''}
+                            onChange={e => setEditForm({ ...editForm, category_id: e.target.value })}
+                            required
+                          >
+                            <option value="" disabled>Select Category</option>
+                            {categories.map(category => (
+                              <option key={category.id} value={category.id}>{category.name}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="py-2 px-3 sm:px-4 border">
+                          <input
+                            type="text"
+                            className="w-full border rounded px-2 py-1 text-sm sm:text-base"
+                            value={editForm.hscode || ''}
+                            onChange={e => setEditForm({ ...editForm, hscode: e.target.value })}
+                          />
+                        </td>
+                        <td className="py-2 px-3 sm:px-4 border">
+                          <select
+                            className="w-full border rounded px-2 py-1 text-sm sm:text-base"
+                            value={editForm.p_unit || ''}
+                            onChange={e => {
+                              setEditForm({ ...editForm, p_unit: e.target.value });
+                              showUnitConversionPopup(units.find(u => u.id == e.target.value));
+                            }}
+                          >
+                            <option value="" disabled>Select Primary Unit</option>
+                            {units.map(unit => (
+                              <option key={unit.id} value={unit.id}>{unit.name}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="py-2 px-3 sm:px-4 border">
+                          <select
+                            className="w-full border rounded px-2 py-1 text-sm sm:text-base"
+                            value={editForm.s_unit || ''}
+                            onChange={e => {
+                              setEditForm({ ...editForm, s_unit: e.target.value });
+                              showUnitConversionPopup(units.find(u => u.id == e.target.value));
+                            }}
+                          >
+                            <option value="" disabled>Select Secondary Unit</option>
+                            {units.map(unit => (
+                              <option key={unit.id} value={unit.id}>{unit.name}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="py-2 px-3 sm:px-4 border">
+                          <input
+                            type="number"
+                            step="any"
+                            className="w-full border rounded px-2 py-1 text-sm sm:text-base"
+                            value={editForm.c_factor || ''}
+                            onChange={e => setEditForm({ ...editForm, c_factor: e.target.value })}
+                          />
+                        </td>
+                        <td className="py-2 px-3 sm:px-4 border">
+                          <input
+                            type="text"
+                            className="w-full border rounded px-2 py-1 text-sm sm:text-base"
+                            value={editForm.description || ''}
+                            onChange={e => setEditForm({ ...editForm, description: e.target.value })}
+                          />
+                        </td>
+                        <td className="py-2 px-3 sm:px-4 border">
+                          <button
+                            className="px-2 py-1 bg-cyan-700 text-white rounded text-xs mr-1"
+                            onClick={saveEdit}
+                          >
+                            Save
+                          </button>
+                          <button
+                            className="px-2 py-1 bg-gray-500 text-white rounded text-xs"
+                            onClick={cancelEdit}
+                          >
+                            Cancel
+                          </button>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">{product.display_name || 'N/A'}</td>
+                        <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">{product.category || 'N/A'}</td>
+                        <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">{product.display_hscode || 'N/A'}</td>
+                        <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">{product.primary_unit || 'N/A'}</td>
+                        <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">{product.secondary_unit || 'N/A'}</td>
+                        <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">{product.c_factor || 'N/A'}</td>
+                        <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">{product.description || 'N/A'}</td>
+                        {showActions && (
+                          <td className="py-2 px-3 sm:px-4 border">
+                            <button
+                              className="px-2 py-1 bg-cyan-800 text-white rounded text-xs"
+                              onClick={() => startEdit(product)}
+                            >
+                              Edit
+                            </button>
+                          </td>
+                        )}
+                      </>
+                    )}
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
-        {setupPagination(filteredProducts.length, allProductsCurrentPage, 'products')}
+        <Pagination total={filteredProducts.length} page={allProductsCurrentPage} type="products" />
       </div>
     );
   };
 
   // Display Units
   const displayUnits = () => {
-    const filteredUnits = filterUnits(units, unitSearchTerm);
-    const startIndex = (unitsCurrentPage - 1) * itemsPerPage;
-    const paginatedUnits = filteredUnits.slice(startIndex, Math.min(startIndex + itemsPerPage, filteredUnits.length));
+    const paginatedUnits = paginate(filteredUnits, unitsCurrentPage);
 
     return (
       <div className="overflow-x-auto">
@@ -389,321 +661,26 @@ const Products = () => {
           <tbody>
             {paginatedUnits.length === 0 ? (
               <tr>
-                <td colSpan="3" className="py-2 px-3 sm:px-4 border text-center text-sm sm:text-base">
+                <td colSpan={3} className="py-2 px-3 sm:px-4 border text-center text-sm sm:text-base">
                   {filteredUnits.length > 0 ? 'No units on this page' : 'No units available'}
                 </td>
               </tr>
             ) : (
               paginatedUnits.map((unit, index) => (
                 <tr key={unit.id}>
-                  <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">{startIndex + index + 1}</td>
+                  <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
+                    {(unitsCurrentPage - 1) * itemsPerPage + index + 1}
+                  </td>
                   <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">{unit.name}</td>
                   <td className="py-2 px-3 sm:px-4 border">
-                    <button className="px-2 py-1 bg-cyan-800 text-white rounded text-sm sm:text-base">Edit</button>
+                    <button className="px-2 py-1 bg-cyan-800 text-white rounded text-xs">Edit</button>
                   </td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
-        {setupPagination(filteredUnits.length, unitsCurrentPage, 'units')}
-      </div>
-    );
-  };
-
-  // Edit Product
-  const editProduct = async (productId) => {
-    if (!user || !user.id || !authToken) {
-      showToast('Authentication token or user ID missing. Please log in again.', true);
-      navigate('/login');
-      return;
-    }
-    if (!units.length) {
-      showToast('No units available. Please add units in the Units section.', true);
-      return;
-    }
-    try {
-      const response = await fetch(`${API_BASE_URL}/products/${productId}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`,
-        },
-      });
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to fetch product details: ${response.status}`);
-      }
-      const productData = await response.json();
-      const product = productData.product;
-      if (!product) {
-        showToast('No product data found.', true);
-        return;
-      }
-      const targetProduct = allProducts.find(p => p.id == productId) || {
-        display_name: product.product_name || product.name || '',
-        display_hscode: product.hscode || '',
-        description: product.description || '',
-        c_factor: product.c_factor || '',
-      };
-      const pUnitValid = product.p_unit ? units.some(u => u.id == product.p_unit) : true;
-      const sUnitValid = product.s_unit ? units.some(u => u.id == product.s_unit) : true;
-      if (!pUnitValid || !sUnitValid) {
-        showToast('Invalid unit IDs for this product. Please update units.', true);
-        return;
-      }
-      setEditProductData({
-        id: product.product_id || product.id || productId,
-        name: targetProduct.display_name || product.product_name || product.name || '',
-        category_id: product.category_id || '',
-        hscode: targetProduct.display_hscode || product.hscode || '',
-        p_unit: product.p_unit || '',
-        s_unit: product.s_unit || '',
-        c_factor: targetProduct.c_factor || product.c_factor || '',
-        description: targetProduct.description || product.description || '',
-      });
-      setShowEditProductPopup(true);
-    } catch (error) {
-      console.error('Error fetching product:', error);
-      showToast('Couldn’t load product details. Please try again.', true);
-    }
-  };
-
-  // Edit Product Popup
-  const EditProductPopup = () => {
-    const [formData, setFormData] = useState(editProductData);
-
-    const handleSubmit = async (e) => {
-      e.preventDefault();
-      if (!user || !authToken) {
-        showToast('You need to log in to edit products.', true);
-        navigate('/login');
-        return;
-      }
-      if (!formData.name || !formData.category_id) {
-        showToast('Please fill in all required fields (Product Name, Category).', true);
-        return;
-      }
-      if (!units.length) {
-        showToast('No units available. Please add units in the Units section.', true);
-        return;
-      }
-      if (formData.p_unit && !units.some(u => u.id == formData.p_unit)) {
-        showToast('Invalid primary unit selected.', true);
-        return;
-      }
-      if (formData.s_unit && !units.some(u => u.id == formData.s_unit)) {
-        showToast('Invalid secondary unit selected.', true);
-        return;
-      }
-      if (formData.c_factor && (isNaN(formData.c_factor) || parseFloat(formData.c_factor) <= 0)) {
-        showToast('Conversion factor must be a positive number.', true);
-        return;
-      }
-
-      const payload = {
-        name: formData.name.trim(),
-        category_id: parseInt(formData.category_id, 10),
-        hscode: formData.hscode ? formData.hscode.trim() : null,
-        p_unit: formData.p_unit ? parseInt(formData.p_unit, 10) : null,
-        s_unit: formData.s_unit === '' || formData.s_unit === '0' ? 0 : parseInt(formData.s_unit, 10),
-        c_factor: formData.c_factor ? parseFloat(formData.c_factor) : null,
-        description: formData.description ? formData.description.trim() : null,
-      };
-
-      try {
-        const response = await fetch(`${API_BASE_URL}/products/${formData.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${authToken}`,
-          },
-          body: JSON.stringify(payload),
-        });
-        const responseText = await response.text();
-        if (response.ok) {
-          showToast('Product updated successfully!');
-          const updatedProduct = JSON.parse(responseText).product;
-          setAllProducts(prev =>
-            prev.map(p =>
-              p.id == formData.id
-                ? {
-                    ...p,
-                    name: updatedProduct.name,
-                    category_id: updatedProduct.category_id,
-                    category: categories.find(cat => cat.id === updatedProduct.category_id)?.name || 'N/A',
-                    hscode: updatedProduct.hscode,
-                    description: updatedProduct.description || 'N/A',
-                    primary_unit: units.find(unit => unit.id === updatedProduct.p_unit)?.name || 'N/A',
-                    secondary_unit: units.find(unit => unit.id === updatedProduct.s_unit)?.name || 'N/A',
-                    c_factor: updatedProduct.c_factor || null,
-                    display_name: updatedProduct.name || 'N/A',
-                    display_hscode: updatedProduct.hscode || 'N/A',
-                  }
-                : p
-            ).sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()))
-          );
-          setShowEditProductPopup(false);
-        } else {
-          let errorMessage = 'Couldn’t update the product.';
-          try {
-            const errorData = JSON.parse(responseText);
-            if (errorData.errors) {
-              const messages = Object.entries(errorData.errors).flatMap(([field, errs]) =>
-                errs.map(err => `${field}: ${err}`)
-              );
-              errorMessage = messages.join('; ');
-            } else if (errorData.message) {
-              errorMessage = errorData.message;
-            } else {
-              errorMessage = responseText;
-            }
-          } catch (e) {
-            errorMessage = responseText || 'Unknown server error.';
-          }
-          showToast(`Failed to update product: ${errorMessage}`, true);
-        }
-      } catch (error) {
-        showToast(`Couldn’t update product: ${error.message}`, true);
-      }
-    };
-
-    if (isMobile) {
-      return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 overflow-y-auto">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-4">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-bold">Edit Product</h2>
-              <button onClick={() => setShowEditProductPopup(false)} className="text-gray-600 hover:text-gray-800">
-                Close
-              </button>
-            </div>
-            <form onSubmit={handleSubmit} className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium mb-1">Product Name *</label>
-                <input type="text" className="w-full border rounded px-2 py-1 text-sm" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} required />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Category *</label>
-                <select className="w-full border rounded px-2 py-1 text-sm" value={formData.category_id} onChange={e => setFormData({ ...formData, category_id: e.target.value })} required>
-                  <option value="" disabled>Select Category</option>
-                  {categories.map(category => (
-                    <option key={category.id} value={category.id}>{category.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">HSCODE</label>
-                <input type="text" className="w-full border rounded px-2 py-1 text-sm" value={formData.hscode} onChange={e => setFormData({ ...formData, hscode: e.target.value })} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Primary Unit</label>
-                <select className="w-full border rounded px-2 py-1 text-sm" value={formData.p_unit} onChange={e => { setFormData({ ...formData, p_unit: e.target.value }); showUnitConversionPopup(units.find(u => u.id == e.target.value)); }}>
-                  <option value="" disabled>Select Primary Unit</option>
-                  {units.map(unit => (
-                    <option key={unit.id} value={unit.id}>{unit.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Secondary Unit</label>
-                <select className="w-full border rounded px-2 py-1 text-sm" value={formData.s_unit} onChange={e => { setFormData({ ...formData, s_unit: e.target.value }); showUnitConversionPopup(units.find(u => u.id == e.target.value)); }}>
-                  <option value="" disabled>Select Secondary Unit</option>
-                  {units.map(unit => (
-                    <option key={unit.id} value={unit.id}>{unit.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Conversion Factor (CF)</label>
-                <input type="number" step="any" className="w-full border rounded px-2 py-1 text-sm" value={formData.c_factor} onChange={e => setFormData({ ...formData, c_factor: e.target.value })} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Description</label>
-                <input type="text" className="w-full border rounded px-2 py-1 text-sm" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} />
-              </div>
-              <div className="flex justify-end space-x-2 mt-4">
-                <button type="button" className="px-4 py-2 bg-gray-500 text-white rounded text-sm" onClick={() => setShowEditProductPopup(false)}>Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-green-500 text-white rounded text-sm">Update Product</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-        <div className="bg-white p-4 sm:p-6 rounded shadow-lg w-full max-w-[95vw] sm:max-w-3xl md:max-w-4xl">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg sm:text-xl font-bold">Edit Product</h2>
-            <button onClick={() => setShowEditProductPopup(false)} className="text-gray-600 hover:text-gray-800 transition">
-              Close
-            </button>
-          </div>
-          <form onSubmit={handleSubmit}>
-            <div className="overflow-x-auto">
-              <table className="min-w-full bg-white border">
-                <thead>
-                  <tr>
-                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base w-[60px] sm:w-[80px]">S.No</th>
-                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base min-w-[150px]">Product Name</th>
-                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base min-w-[120px]">Category</th>
-                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base min-w-[100px]">HSCODE</th>
-                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base min-w-[100px] sm:min-w-[120px]">P. Unit</th>
-                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base min-w-[100px] sm:min-w-[120px]">S. Unit</th>
-                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base min-w-[100px] sm:min-w-[120px]">CF</th>
-                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base min-w-[150px]">Description</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">1</td>
-                    <td className="py-2 px-3 sm:px-4 border">
-                      <input type="text" className="w-full border rounded px-2 py-1 h-10 sm:h-12 text-sm sm:text-base" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} required />
-                    </td>
-                    <td className="py-2 px-3 sm:px-4 border">
-                      <select className="w-full border rounded px-2 py-1 h-10 sm:h-12 text-sm sm:text-base" value={formData.category_id} onChange={e => setFormData({ ...formData, category_id: e.target.value })} required>
-                        <option value="" disabled>Select Category</option>
-                        {categories.map(category => (
-                          <option key={category.id} value={category.id}>{category.name}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="py-2 px-3 sm:px-4 border">
-                      <input type="text" className="w-full border rounded px-2 py-1 h-10 sm:h-12 text-sm sm:text-base" value={formData.hscode} onChange={e => setFormData({ ...formData, hscode: e.target.value })} />
-                    </td>
-                    <td className="py-2 px-3 sm:px-4 border">
-                      <select className="w-full border rounded px-2 py-1 h-10 sm:h-12 text-sm sm:text-base" value={formData.p_unit} onChange={e => { setFormData({ ...formData, p_unit: e.target.value }); showUnitConversionPopup(units.find(unit => unit.id == e.target.value)); }}>
-                        <option value="" disabled>Select Primary Unit</option>
-                        {units.map(unit => (
-                          <option key={unit.id} value={unit.id}>{unit.name}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="py-2 px-3 sm:px-4 border">
-                      <select className="w-full border rounded px-2 py-1 h-10 sm:h-12 text-sm sm:text-base" value={formData.s_unit} onChange={e => { setFormData({ ...formData, s_unit: e.target.value }); showUnitConversionPopup(units.find(unit => unit.id == e.target.value)); }}>
-                        <option value="" disabled>Select Secondary Unit</option>
-                        {units.map(unit => (
-                          <option key={unit.id} value={unit.id}>{unit.name}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="py-2 px-3 sm:px-4 border">
-                      <input type="number" step="any" className="w-full border rounded px-2 py-1 h-10 sm:h-12 text-sm sm:text-base" value={formData.c_factor} onChange={e => setFormData({ ...formData, c_factor: e.target.value })} />
-                    </td>
-                    <td className="py-2 px-3 sm:px-4 border">
-                      <input type="text" className="w-full border rounded px-2 py-1 h-10 sm:h-12 text-sm sm:text-base" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} />
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <div className="flex justify-end mt-4 space-x-2">
-              <button type="button" className="px-4 py-2 bg-red-800 text-white rounded text-sm sm:text-base" onClick={() => setShowEditProductPopup(false)}>Cancel</button>
-              <button type="submit" className="px-4 py-2 bg-cyan-800 text-white rounded text-sm sm:text-base">Update Product</button>
-            </div>
-          </form>
-        </div>
+        <Pagination total={filteredUnits.length} page={unitsCurrentPage} type="units" />
       </div>
     );
   };
@@ -875,7 +852,7 @@ const Products = () => {
           showToast('Products saved successfully!', false);
           const responseData = JSON.parse(responseText);
           const newProducts = responseData.products || [];
-          const newAllProducts = newProducts.map((newProduct) => ({
+          const newAllProducts = newProducts.map(newProduct => ({
             id: newProduct.id,
             name: newProduct.name,
             category_id: newProduct.category_id,
@@ -887,6 +864,8 @@ const Products = () => {
             primary_unit: units.find(unit => unit.id === newProduct.p_unit)?.name || 'N/A',
             secondary_unit: units.find(unit => unit.id === newProduct.s_unit)?.name || 'N/A',
             c_factor: newProduct.c_factor || 'N/A',
+            p_unit_id: newProduct.p_unit,
+            s_unit_id: newProduct.s_unit,
           }));
           setAllProducts([...allProducts, ...newAllProducts].sort((a, b) =>
             a.name.toLowerCase().localeCompare(b.name.toLowerCase())
@@ -922,7 +901,7 @@ const Products = () => {
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-4">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-bold">Add New Product</h2>
-              <button onClick={() => setShowAddProductPopup(false)} className="text-gray-600">
+              <button onClick={() => setShowAddProductPopup(false)} className="text-cyan-700">
                 Close
               </button>
             </div>
@@ -985,7 +964,7 @@ const Products = () => {
                 <button type="button" className="px-4 py-2 bg-cyan-800 text-white rounded text-sm" onClick={() => { setShowAddProductPopup(false); setShowAddCategoryPopup(true); }}>Add Category</button>
                 <div className="flex space-x-2">
                   <button type="button" className="flex-1 px-4 py-2 bg-red-800 text-white rounded text-sm" onClick={() => setShowAddProductPopup(false)}>Close</button>
-                  <button type="submit" className="flex-1 px-4 py-2 bg-green-600 text-white rounded text-sm">Save All</button>
+                  <button type="submit" className="flex-1 px-4 py-2 bg-cyan-700 text-white rounded text-sm">Save All</button>
                 </div>
               </div>
             </form>
@@ -999,7 +978,7 @@ const Products = () => {
         <div className="bg-white p-4 sm:p-6 rounded shadow-lg w-full max-w-[95vw] sm:max-w-3xl md:max-w-4xl">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg sm:text-xl font-bold">Add New Product</h2>
-            <button onClick={() => setShowAddProductPopup(false)} className="text-gray-600">
+            <button onClick={() => setShowAddProductPopup(false)} className="text-cyan-700">
               Close
             </button>
           </div>
@@ -1135,7 +1114,7 @@ const Products = () => {
         <div className="bg-white p-4 sm:p-6 rounded shadow-lg w-full max-w-[95vw] sm:max-w-md">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg sm:text-xl font-bold">Add New Category</h2>
-            <button onClick={() => setShowAddCategoryPopup(false)} className="text-gray-600">
+            <button onClick={() => setShowAddCategoryPopup(false)} className="text-cyan-700">
               Close
             </button>
           </div>
@@ -1199,7 +1178,7 @@ const Products = () => {
         <div className="bg-white p-4 sm:p-6 rounded shadow-lg w-full max-w-[95vw] sm:max-w-md">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg sm:text-xl font-bold">Add New Unit</h2>
-            <button onClick={() => setShowAddUnitPopup(false)} className="text-gray-600">
+            <button onClick={() => setShowAddUnitPopup(false)} className="text-cyan-700">
               Close
             </button>
           </div>
@@ -1333,7 +1312,6 @@ const Products = () => {
         </div>
       </div>
       {showAddProductPopup && <AddProductPopup />}
-      {showEditProductPopup && <EditProductPopup />}
       {showAddCategoryPopup && <AddCategoryPopup />}
       {showAddUnitPopup && <AddUnitPopup />}
     </main>
