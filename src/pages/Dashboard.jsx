@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../components/Card"; // Reusable Card component
 import { FaArrowRight, FaUserCircle } from "react-icons/fa";
+import Header from "../components/Header";
 
 const API_BASE_URL = "http://127.0.0.1:8000/api"; // or your backend URL
 
@@ -85,7 +86,8 @@ export default function Dashboard() {
   return (
     <main className="flex-1 p-6">
       {/* Header */}
-      <div className="flex justify-between items-center bg-white p-3  shadow rounded-xl mb-6">
+      <Header title="Dashboard" />
+      {/* <div className="flex justify-between items-center bg-white p-3  shadow rounded-xl mb-6">
         <h4 className="text-2xl font-base text-slate-800">Dashboard</h4>
         <div
           className="flex items-center gap-2 text-slate-700 cursor-pointer"
@@ -94,7 +96,7 @@ export default function Dashboard() {
 <FaUserCircle className="text-2xl" />
           <span className="font-medium">{user?.name || user?.client_name || "User"}</span>
         </div>
-      </div>
+      </div> */}
 
       {/* Welcome */}
       <div className="text-center mb-8 bg-gradient-to-r from-neutral-800 to-cyan-700 text-white p-6 rounded-lg shadow-md">
@@ -117,7 +119,7 @@ export default function Dashboard() {
     title="Pending User Requests"
     onClick={() => navigate("/admin")}
     cornerIcon={<FaArrowRight />} // arrow in bottom-right
-    className=" hover:bg-blue-100 border-2 border-cyan-300 bg-cyan-100 "
+    className=" bg-blue-100 border-2 border-blue-400 hover:bg-blue-200  "
   />
 )}
 

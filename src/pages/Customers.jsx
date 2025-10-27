@@ -3,6 +3,7 @@ import { showToast } from "../utils";
 import { FaEdit, FaSave, FaTimes, FaSearch, FaPlus } from "react-icons/fa";
 import { MdAddCircle } from "react-icons/md";
 import { GrUpdate } from "react-icons/gr";
+import Header from "../components/Header";
 
 
 
@@ -48,6 +49,7 @@ export default function Customer() {
 
   useEffect(() => {
     fetchCustomers();
+    
   }, []);
 
   // --- Edit Logic ---
@@ -139,10 +141,10 @@ export default function Customer() {
   });
 
   return (
-    <div className="customer-page p-4 sm:p-6">
-      <div className="text-2xl mb-6 bg-gradient-to-r from-neutral-800 to-cyan-700 text-white p-6 rounded-lg shadow-md">
-        <h2 className="font-bold text-center sm:text-left">Customer</h2>
-      </div>
+    <div className="customer-page p-6 sm:p-6">
+
+   <Header title="Customers" bgColor="bg-gradient-to-r from-neutral-800 to-cyan-700 text-white" />
+
 
       <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 space-y-6">
         {/* Header */}

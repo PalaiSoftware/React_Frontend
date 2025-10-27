@@ -23,6 +23,7 @@ export default function Admin() {
     fetchPendingUsers(1);
   }, [storedUser, token]);
 
+
   const fetchPendingUsers = useCallback(
     async (page = 1) => {
       try {
