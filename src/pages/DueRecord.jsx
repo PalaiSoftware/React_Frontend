@@ -1,10 +1,6 @@
 // src/pages/DueRecord.jsx
 import React, { useEffect, useState, useMemo } from "react";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
-/* eslint-disable no-unused-vars */
-import { motion, AnimatePresence } from "framer-motion";
-/* eslint-enable no-unused-vars */
-
 import Header from "../components/Header";
 
 const API_BASE_URL = "http://127.0.0.1:8000/api";
@@ -113,118 +109,116 @@ export default function DueRecord() {
   );
 
   return (
-    <div className=" p-6 text-slate-800">
-   <Header title="Due Records" bgColor="bg-gradient-to-r from-neutral-800 to-cyan-700 text-white" />
-   <main className="bg-white rounded-md shadow-lg ">
-  
-      <div className="p-4 max-w-7xl mx-auto">
-        {toast && (
-          <div
-            className={`fixed top-4 right-4 px-4 py-2 rounded-lg shadow-lg text-white z-50 transition ${
-              toast.isError ? "bg-red-600" : "bg-slate-800"
-            }`}
-          >
-            {toast.message}
-          </div>
-        )}
-
-        {/* Header Row */}
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-5">
-          <h1 className="text-xl sm:text-2xl font-semibold text-slate-700 text-center sm:text-left">
-            Customer Dues
-          </h1>
-          <input
-            type="text"
-            placeholder="Search Customer..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="border border-slate-300 rounded-lg px-3 py-2 w-full sm:w-64 shadow-sm focus:ring-2 focus:ring-cyan-700 outline-none bg-white"
-          />
-        </div>
-
-        {/* Desktop Table */}
-        <div className="hidden sm:block bg-white shadow-md rounded-lg overflow-hidden border border-slate-200">
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm text-left">
-              <thead className="bg-slate-50 text-slate-600">
-                <tr>
-                  <th className="px-4 py-2">S.No</th>
-                  <th className="px-4 py-2">Customer Name</th>
-                  <th className="px-4 py-2">Total Purchase</th>
-                  <th className="px-4 py-2">Total Paid</th>
-                  <th className="px-4 py-2">Total Due</th>
-                  <th className="px-4 py-2 text-center">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedDues.length === 0 ? (
-                  <tr>
-                    <td colSpan="6" className="text-center py-4 text-slate-500">
-                      No dues found
-                    </td>
-                  </tr>
-                ) : (
-                  paginatedDues.map((due, i) => (
-                    <DueRow
-                      key={due.customer_id}
-                      due={due}
-                      index={(currentPage - 1) * ITEMS_PER_PAGE + i + 1}
-                      getCurrencySymbol={getCurrencySymbol}
-                      fetchCustomerTransactions={fetchCustomerTransactions}
-                    />
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Mobile Cards */}
-        <div className="sm:hidden flex flex-col gap-3">
-          {paginatedDues.map((due, i) => (
-            <DueCard
-              key={due.customer_id}
-              index={(currentPage - 1) * ITEMS_PER_PAGE + i + 1}
-              due={due}
-              getCurrencySymbol={getCurrencySymbol}
-              fetchCustomerTransactions={fetchCustomerTransactions}
-            />
-          ))}
-        </div>
-
-        {/* Pagination */}
-        <div className="flex justify-center items-center flex-wrap gap-2 mt-5">
-          <button
-            onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
-            disabled={currentPage === 1}
-            className="px-3 py-1 bg-slate-200 rounded-md disabled:opacity-50 hover:bg-slate-300"
-          >
-            &lt;
-          </button>
-          {[...Array(totalPages)].map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setCurrentPage(i + 1)}
-              className={`px-3 py-1 rounded-md ${
-                currentPage === i + 1
-                  ? "bg-cyan-800 text-white"
-                  : "bg-slate-200 hover:bg-slate-300"
+    <div className="p-6 text-slate-800">
+      <Header title="Due Records" bgColor="bg-gradient-to-r from-neutral-800 to-cyan-700 text-white" />
+      <main className="bg-white rounded-md shadow-lg">
+        <div className="p-4 max-w-7xl mx-auto">
+          {toast && (
+            <div
+              className={`fixed top-4 right-4 px-4 py-2 rounded-lg shadow-lg text-white z-50 transition ${
+                toast.isError ? "bg-red-600" : "bg-slate-800"
               }`}
             >
-              {i + 1}
+              {toast.message}
+            </div>
+          )}
+
+          {/* Header Row */}
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-5">
+            <h1 className="text-xl sm:text-2xl font-semibold text-slate-700 text-center sm:text-left">
+              Customer Dues
+            </h1>
+            <input
+              type="text"
+              placeholder="Search Customer..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="border border-slate-300 rounded-lg px-3 py-2 w-full sm:w-64 shadow-sm focus:ring-2 focus:ring-cyan-700 outline-none bg-white"
+            />
+          </div>
+
+          {/* Desktop Table */}
+          <div className="hidden sm:block bg-white shadow-md rounded-lg overflow-hidden border border-slate-200">
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm text-left">
+                <thead className="bg-slate-50 text-slate-600">
+                  <tr>
+                    <th className="px-4 py-2">S.No</th>
+                    <th className="px-4 py-2">Customer Name</th>
+                    <th className="px-4 py-2">Total Purchase</th>
+                    <th className="px-4 py-2">Total Paid</th>
+                    <th className="px-4 py-2">Total Due</th>
+                    <th className="px-4 py-2 text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedDues.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="text-center py-4 text-slate-500">
+                        No dues found
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedDues.map((due, i) => (
+                      <DueRow
+                        key={due.customer_id}
+                        due={due}
+                        index={(currentPage - 1) * ITEMS_PER_PAGE + i + 1}
+                        getCurrencySymbol={getCurrencySymbol}
+                        fetchCustomerTransactions={fetchCustomerTransactions}
+                      />
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Mobile Cards */}
+          <div className="sm:hidden flex flex-col gap-3">
+            {paginatedDues.map((due, i) => (
+              <DueCard
+                key={due.customer_id}
+                index={(currentPage - 1) * ITEMS_PER_PAGE + i + 1}
+                due={due}
+                getCurrencySymbol={getCurrencySymbol}
+                fetchCustomerTransactions={fetchCustomerTransactions}
+              />
+            ))}
+          </div>
+
+          {/* Pagination */}
+          <div className="flex justify-center items-center flex-wrap gap-2 mt-5">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 bg-slate-200 rounded-md disabled:opacity-50 hover:bg-slate-300"
+            >
+              &lt;
             </button>
-          ))}
-          <button
-            onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
-            disabled={currentPage === totalPages}
-            className="px-3 py-1 bg-slate-200 rounded-md disabled:opacity-50 hover:bg-slate-300"
-          >
-            &gt;
-          </button>
+            {[...Array(totalPages)].map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setCurrentPage(i + 1)}
+                className={`px-3 py-1 rounded-md ${
+                  currentPage === i + 1
+                    ? "bg-cyan-800 text-white"
+                    : "bg-slate-200 hover:bg-slate-300"
+                }`}
+              >
+                {i + 1}
+              </button>
+            ))}
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 bg-slate-200 rounded-md disabled:opacity-50 hover:bg-slate-300"
+            >
+              &gt;
+            </button>
+          </div>
         </div>
-      </div>
-        
-   </main>
+      </main>
     </div>
   );
 }
@@ -280,58 +274,49 @@ function DueRow({ due, index, getCurrencySymbol, fetchCustomerTransactions }) {
         </td>
       </tr>
 
-      <AnimatePresence>
-        {expanded && (
-          <tr className="bg-slate-50 border-t border-slate-200">
-            <td colSpan="6" className="px-6 py-3">
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.4 }}
-              >
-                {loading ? (
-                  <p className="text-slate-500 italic">Loading transaction details...</p>
-                ) : transactions.length === 0 ? (
-                  <p className="text-slate-500 italic">No transactions found.</p>
-                ) : (
-                  <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm overflow-x-auto">
-                    <table className="w-full text-sm text-left min-w-[400px]">
-                      <thead className="bg-slate-100">
-                        <tr>
-                          <th className="px-3 py-2">Date</th>
-                          <th className="px-3 py-2">Purchase</th>
-                          <th className="px-3 py-2">Paid</th>
-                          <th className="px-3 py-2">Due</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {transactions.map((t, i) => (
-                          <tr key={i} className="border-b hover:bg-slate-50">
-                            <td className="px-3 py-2">{t.date || "-"}</td>
-                            <td className="px-3 py-2">
-                              {getCurrencySymbol()}
-                              {Number(t.purchase || 0).toFixed(2)}
-                            </td>
-                            <td className="px-3 py-2">
-                              {getCurrencySymbol()}
-                              {Number(t.paid || 0).toFixed(2)}
-                            </td>
-                            <td className="px-3 py-2 text-cyan-800 font-semibold">
-                              {getCurrencySymbol()}
-                              {Number(t.due || 0).toFixed(2)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </motion.div>
-            </td>
-          </tr>
-        )}
-      </AnimatePresence>
+      {expanded && (
+        <tr className="bg-slate-50 border-t border-slate-200">
+          <td colSpan="6" className="px-6 py-3">
+            {loading ? (
+              <p className="text-slate-500 italic">Loading transaction details...</p>
+            ) : transactions.length === 0 ? (
+              <p className="text-slate-500 italic">No transactions found.</p>
+            ) : (
+              <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm overflow-x-auto">
+                <table className="w-full text-sm text-left min-w-[400px]">
+                  <thead className="bg-slate-100">
+                    <tr>
+                      <th className="px-3 py-2">Date</th>
+                      <th className="px-3 py-2">Purchase</th>
+                      <th className="px-3 py-2">Paid</th>
+                      <th className="px-3 py-2">Due</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {transactions.map((t, i) => (
+                      <tr key={i} className="border-b hover:bg-slate-50">
+                        <td className="px-3 py-2">{t.date || "-"}</td>
+                        <td className="px-3 py-2">
+                          {getCurrencySymbol()}
+                          {Number(t.purchase || 0).toFixed(2)}
+                        </td>
+                        <td className="px-3 py-2">
+                          {getCurrencySymbol()}
+                          {Number(t.paid || 0).toFixed(2)}
+                        </td>
+                        <td className="px-3 py-2 text-cyan-800 font-semibold">
+                          {getCurrencySymbol()}
+                          {Number(t.due || 0).toFixed(2)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </td>
+        </tr>
+      )}
     </>
   );
 }
@@ -380,55 +365,47 @@ function DueCard({ due, index, getCurrencySymbol, fetchCustomerTransactions }) {
         </p>
       </div>
 
-      <AnimatePresence>
-        {expanded && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.4 }}
-            className="mt-3 border-t pt-2 text-sm text-slate-700"
-          >
-            {loading ? (
-              <p className="text-slate-500 italic">Loading transactions...</p>
-            ) : transactions.length === 0 ? (
-              <p className="text-slate-500 italic">No transactions found.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-xs text-left">
-                  <thead className="bg-slate-100">
-                    <tr>
-                      <th className="px-2 py-1">Date</th>
-                      <th className="px-2 py-1">Purchase</th>
-                      <th className="px-2 py-1">Paid</th>
-                      <th className="px-2 py-1">Due</th>
+      {expanded && (
+        <div className="mt-3 border-t pt-2 text-sm text-slate-700">
+          {loading ? (
+            <p className="text-slate-500 italic">Loading transactions...</p>
+          ) : transactions.length === 0 ? (
+            <p className="text-slate-500 italic">No transactions found.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-xs text-left">
+                <thead className="bg-slate-100">
+                  <tr>
+                    <th className="px-2 py-1">Date</th>
+                    <th className="px-2 py-1">Purchase</th>
+                    <th className="px-2 py-1">Paid</th>
+                    <th className="px-2 py-1">Due</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {transactions.map((t, i) => (
+                    <tr key={i} className="border-b">
+                      <td className="px-2 py-1">{t.date || "-"}</td>
+                      <td className="px-2 py-1">
+                        {getCurrencySymbol()}
+                        {Number(t.purchase || 0).toFixed(2)}
+                      </td>
+                      <td className="px-2 py-1">
+                        {getCurrencySymbol()}
+                        {Number(t.paid || 0).toFixed(2)}
+                      </td>
+                      <td className="px-2 py-1 text-cyan-800 font-semibold">
+                        {getCurrencySymbol()}
+                        {Number(t.due || 0).toFixed(2)}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {transactions.map((t, i) => (
-                      <tr key={i} className="border-b">
-                        <td className="px-2 py-1">{t.date || "-"}</td>
-                        <td className="px-2 py-1">
-                          {getCurrencySymbol()}
-                          {Number(t.purchase || 0).toFixed(2)}
-                        </td>
-                        <td className="px-2 py-1">
-                          {getCurrencySymbol()}
-                          {Number(t.paid || 0).toFixed(2)}
-                        </td>
-                        <td className="px-2 py-1 text-cyan-800 font-semibold">
-                          {getCurrencySymbol()}
-                          {Number(t.due || 0).toFixed(2)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
