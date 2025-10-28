@@ -19,7 +19,6 @@ export default function ProductInfo() {
   const [user, setUser] = useState(null);
   const [authToken, setAuthToken] = useState(null);
   const [productInfoList, setProductInfoList] = useState([]);
-  const [stockData, setStockData] = useState([]);
   const [unitData, setUnitData] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
@@ -62,10 +61,8 @@ export default function ProductInfo() {
       if (!res.ok) throw new Error('Failed to fetch units');
       const data = await res.json();
       setUnitData(data.units || []);
-      return data.units || [];
     } catch (err) {
       showToast(err.message, true);
-      return [];
     }
   };
 
@@ -84,7 +81,6 @@ export default function ProductInfo() {
         sales_stock: s.sales_stock || '0',
         current_stock: s.current_stock || '0',
       }));
-      setStockData(mapped);
       return mapped;
     } catch (err) {
       showToast(err.message, true);
@@ -106,7 +102,7 @@ export default function ProductInfo() {
       const data = await res.json();
 
       const stock = await fetchStockData();
-      const units = await fetchUnits();
+      await fetchUnits(); // Fetch units to populate state for EditForm
 
       const list = (data || [])
         .map((p) => {
@@ -220,25 +216,31 @@ export default function ProductInfo() {
 
   return (
     <>
-      <div className="min-h-screen bg-gray-50">
+      <div className="p-6">
         {/* Header */}
-        <Header title="Products Information" bgColor="bg-gradient-to-r from-neutral-800 to-cyan-700 text-white" />
+        <Header
+          title="Products Info."
+          bgColor="bg-gradient-to-r from-neutral-800 to-cyan-700 text-white"
+        />
 
         {/* Main Content */}
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          {/* Search Bar */}
-          <div className="relative max-w-md mb-6">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Search products..."
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-700"
-            />
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 bg-white">
+          <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-6">
+            <h2 className=' font-bold text-lg text-cyan-950 mb-2 '>Product Information List</h2>
+            {/* Search Bar */}
+            <div className="relative max-w-md mb-6">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="Search products..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-700"
+              />
+            </div>
           </div>
 
           {/* Table View - Large Screens */}
@@ -246,39 +248,39 @@ export default function ProductInfo() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase">
                     S.No
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase">
                     Product
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase">
                     Unit
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase">
                     HSN
                   </th>
                   {!isRestricted && (
                     <>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase">
                         Purchase
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Profit %
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase">
+                        Profit
                       </th>
                     </>
                   )}
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase">
                     Costs
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase">
                     Stocks
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase">
                     Desc
                   </th>
                   {!isRestricted && (
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase">
                       Action
                     </th>
                   )}
@@ -287,10 +289,7 @@ export default function ProductInfo() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {paginated.length === 0 ? (
                   <tr>
-                    <td
-                      colSpan="10"
-                      className="text-center py-8 text-gray-500"
-                    >
+                    <td colSpan="10" className="text-center py-8 text-gray-500">
                       No products found
                     </td>
                   </tr>
@@ -403,10 +402,7 @@ export default function ProductInfo() {
                 const idx = (currentPage - 1) * itemsPerPage + i + 1;
                 const isEditing = editingId === p.id;
                 return (
-                  <div
-                    key={p.id}
-                    className="bg-white rounded-lg shadow p-4"
-                  >
+                  <div key={p.id} className="bg-white rounded-lg shadow p-4">
                     <div className="flex justify-between items-start mb-2">
                       <h3 className="font-semibold text-lg">
                         {idx}. {p.name}
@@ -601,10 +597,7 @@ function EditForm({ product, units, onSave, onCancel }) {
         rows="2"
       />
       <div className="md:col-span-2 lg:col-span-3 flex gap-2">
-        <button
-          onClick={onCancel}
-          className="px-4 py-2 border rounded-lg"
-        >
+        <button onClick={onCancel} className="px-4 py-2 border rounded-lg">
           Cancel
         </button>
         <button

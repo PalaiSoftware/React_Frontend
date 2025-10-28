@@ -6,7 +6,6 @@ import Header from "../components/Header";
 
 const API_BASE_URL = "http://127.0.0.1:8000/api"; // or your backend URL
 
-
 export default function Dashboard() {
   const navigate = useNavigate();
 
@@ -40,38 +39,39 @@ export default function Dashboard() {
     const fetchDashboardData = async () => {
       try {
         // Fetch Sales / Orders / Customers
-       const salesRes = await fetch(
-  `${API_BASE_URL}/total-sale/${storedUser.cid}`,
-  {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
-  }
-);
+        const salesRes = await fetch(
+          `${API_BASE_URL}/total-sale/${storedUser.cid}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+            },
+          }
+        );
 
         const salesData = await salesRes.json();
 
         // Fetch Purchases / Vendors
-        const purchaseRes = await fetch(
-  `${API_BASE_URL}/purchase-widget`,
-  {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ cid: storedUser.cid, period: "month" }),
-  }
-);
+        const purchaseRes = await fetch(`${API_BASE_URL}/purchase-widget`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ cid: storedUser.cid, period: "month" }),
+        });
 
         const purchaseData = await purchaseRes.json();
 
         setStats({
-          totalSales: `₹${(salesData.grand_total || 0).toLocaleString("en-IN")}`,
+          totalSales: `₹${(salesData.grand_total || 0).toLocaleString(
+            "en-IN"
+          )}`,
           totalOrders: salesData.total_sale_order || 0,
           totalCustomers: salesData.total_customer || 0,
-          totalPurchase: `₹${(parseFloat(purchaseData.total_purchase_amount) || 0).toLocaleString("en-IN")}`,
+          totalPurchase: `₹${(
+            parseFloat(purchaseData.total_purchase_amount) || 0
+          ).toLocaleString("en-IN")}`,
           totalPurchaseOrders: purchaseData.total_purchase_order || 0,
           totalVendors: purchaseData.total_vendor || 0,
         });
@@ -101,28 +101,39 @@ export default function Dashboard() {
       {/* Welcome */}
       <div className="text-center mb-8 bg-gradient-to-r from-neutral-800 to-cyan-700 text-white p-6 rounded-lg shadow-md">
         <h3 className="text-xl font-semibold">
-          Welcome <span className="text-yellow-600">{user?.client_name || "User"}</span> to Your Inventory Management Dashboard!
+          Welcome{" "}
+          <span className="text-yellow-600">{user?.client_name || "User"}</span>{" "}
+          to Your Inventory Management Dashboard!
         </h3>
-        <p className="text-slate-400">Streamline Your Business, Amplify Your Success</p>
+        <p className="text-slate-400">
+          Streamline Your Business, Amplify Your Success
+        </p>
       </div>
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         <Card title="Total Sales" value={stats.totalSales} growth="+0%" />
         <Card title="Total Orders" value={stats.totalOrders} growth="+0%" />
-        <Card title="Total Customers" value={stats.totalCustomers} growth="+0%"  />
+        <Card
+          title="Total Customers"
+          value={stats.totalCustomers}
+          growth="+0%"
+        />
         <Card title="Total Purchase" value={stats.totalPurchase} growth="+0%" />
-        <Card title="Total Purchase Orders" value={stats.totalPurchaseOrders} growth="+0%" />
-        <Card title="Total Vendors" value={stats.totalVendors} growth="+0%"/>
- {showPendingRequests && (
-  <Card
-    title="Pending User Requests"
-    onClick={() => navigate("/admin")}
-    cornerIcon={<FaArrowRight />} // arrow in bottom-right
-    className=" bg-blue-100 border-2 border-blue-400 hover:bg-blue-200  "
-  />
-)}
-
+        <Card
+          title="Total Purchase Orders"
+          value={stats.totalPurchaseOrders}
+          growth="+0%"
+        />
+        <Card title="Total Vendors" value={stats.totalVendors} growth="+0%" />
+        {showPendingRequests && (
+          <Card
+            title="Pending User Requests"
+            onClick={() => navigate("/admin")}
+            cornerIcon={<FaArrowRight />} // arrow in bottom-right
+            className=" bg-blue-100 border-2 border-blue-950 hover:bg-blue-200  "
+          />
+        )}
       </div>
     </main>
   );

@@ -1,27 +1,14 @@
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+/* eslint-disable no-unused-vars */
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Header from '../components/Header';
+import { FaPlus } from "react-icons/fa";
+import { TbRulerMeasure } from "react-icons/tb";
 
-const API_BASE_URL = "http://127.0.0.1:8000/api";
-
-// Custom Header Component with User Profile
-const CustomHeader = ({ title, userName, onProfileClick, isUnitSection }) => {
-  return (
-    <div className="bg-gradient-to-r from-neutral-800 to-cyan-700 text-white p-4 sm:p-6 rounded-t-lg shadow-md">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
-        <h1 className="text-2xl sm:text-3xl font-bold">{isUnitSection ? 'Units Information' : title}</h1>
-        <div
-          className="flex items-center space-x-2 cursor-pointer hover:opacity-80 transition-opacity mt-2 sm:mt-0"
-          onClick={onProfileClick}
-        >
-          <i className="fas fa-user-circle text-2xl sm:text-3xl"></i>
-          <span className="text-base sm:text-lg font-medium">{userName}</span>
-        </div>
-      </div>
-    </div>
-  );
-};
+const API_BASE_URL = 'http://127.0.0.1:8000/api';
 
 const Products = () => {
+  /* ────────────────────── STATE ────────────────────── */
   const [allProducts, setAllProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [units, setUnits] = useState([]);
@@ -39,247 +26,272 @@ const Products = () => {
   const [editForm, setEditForm] = useState({});
   const [isDataFetched, setIsDataFetched] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+
   const itemsPerPage = 50;
   const navigate = useNavigate();
 
-  // Safe localStorage parsing
+  /* ────────────────────── HELPERS ────────────────────── */
   const user = useMemo(() => {
     const stored = localStorage.getItem('user');
     if (!stored) return {};
-    try { return JSON.parse(stored); }
-    catch { localStorage.removeItem('user'); return {}; }
+    try {
+      return JSON.parse(stored);
+    } catch {
+      localStorage.removeItem('user');
+      return {};
+    }
   }, []);
 
   const authToken = useMemo(() => localStorage.getItem('authToken') || null, []);
 
-  // Responsive: Detect mobile
+  /* ────────────────────── RESPONSIVE ────────────────────── */
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
   }, []);
 
-  // Toast Notification
-  const showToast = (message, isError = false) => {
-    const toast = document.createElement('div');
-    toast.className = `fixed top-5 right-5 p-4 rounded shadow-lg z-50 text-sm sm:text-base ${isError ? 'bg-red-500' : 'bg-cyan-800'} text-white`;
-    toast.textContent = message;
-    document.body.appendChild(toast);
+  /* ────────────────────── TOAST ────────────────────── */
+  const showToast = useCallback((msg, error = false) => {
+    const el = document.createElement('div');
+    el.className = `fixed top-5 right-5 p-4 rounded shadow-lg z-50 text-sm sm:text-base ${
+      error ? 'bg-red-500' : 'bg-cyan-800'
+    } text-white`;
+    el.textContent = msg;
+    document.body.appendChild(el);
     setTimeout(() => {
-      toast.style.opacity = '0';
-      setTimeout(() => toast.remove(), 300);
+      el.style.opacity = '0';
+      setTimeout(() => el.remove(), 300);
     }, 3000);
-  };
+  }, []);
 
-  // Unit Conversion Popup
-  const showUnitConversionPopup = (unit) => {
-    if (unit && ['kg', 'gram'].includes(unit.name.toLowerCase())) {
-      const popup = document.createElement('div');
-      popup.className = 'fixed top-5 right-5 bg-cyan-800 text-white p-4 rounded shadow-lg z-50 text-sm sm:text-base';
-      popup.textContent = 'To buy in grams, select kg and enter the quantity in decimals (e.g., 0.25 kg = 250 g).';
-      document.body.appendChild(popup);
-      setTimeout(() => {
-        popup.style.opacity = '0';
-        setTimeout(() => popup.remove(), 300);
-      }, 3000);
-    }
-  };
+  /* ────────────────────── UNIT POPUP ────────────────────── */
+  const showUnitConversionPopup = useCallback(
+    (unit) => {
+      if (unit && ['kg', 'gram'].includes(unit.name.toLowerCase())) {
+        const el = document.createElement('div');
+        el.className =
+          'fixed top-5 right-5 bg-cyan-800 text-white p-4 rounded shadow-lg z-50 text-sm sm:text-base';
+        el.textContent =
+          'To buy in grams, select kg and enter the quantity in decimals (e.g., 0.25 kg = 250 g).';
+        document.body.appendChild(el);
+        setTimeout(() => {
+          el.style.opacity = '0';
+          setTimeout(() => el.remove(), 300);
+        }, 3000);
+      }
+    },
+    []
+  );
 
-  // Fetch User Data
-  const fetchUserData = async () => {
+  /* ────────────────────── FETCH USER ────────────────────── */
+  const fetchUserData = useCallback(async () => {
     if (!authToken || !user?.id) {
-      showToast('Authentication token or user ID missing. Redirecting to login.', true);
+      showToast('Authentication missing. Redirecting…', true);
       navigate('/login');
       return;
     }
     try {
-      const response = await fetch(`${API_BASE_URL}/user/${user.id}`, {
+      const res = await fetch(`${API_BASE_URL}/user/${user.id}`, {
         headers: {
           Authorization: `Bearer ${authToken}`,
           Accept: 'application/json',
           'Content-Type': 'application/json',
         },
       });
-      if (!response.ok) {
-        if (response.status === 401) {
+      if (!res.ok) {
+        if (res.status === 401) {
           localStorage.clear();
           navigate('/login');
-          throw new Error('Unauthorized');
+          showToast('Session expired. Please log in again.', true);
+          return;
         }
-        throw new Error(`Failed to fetch user data: ${response.status}`);
+        throw new Error(`User fetch error ${res.status}`);
       }
-      const userData = await response.json();
-      setUserName(userData.data?.name || 'User');
-    } catch (error) {
-      console.error('Error fetching user data:', error);
+      const data = await res.json();
+      setUserName(data.data?.name || 'User');
+    } catch (e) {
+      console.error('User fetch error:', e);
       showToast('Failed to load user data.', true);
     }
-  };
+  }, [authToken, user?.id, navigate, showToast]);
 
-  // Fetch All Products
-  const fetchAllProducts = async () => {
-    if (!user || !authToken) {
-      showToast('You need to log in to view all products.', true);
-      setAllProducts([]);
+  /* ────────────────────── FETCH DATA ────────────────────── */
+  const fetchAllProducts = useCallback(async () => {
+    if (!user?.cid || !authToken) {
+      showToast('Missing user or authentication data.', true);
       return;
     }
     try {
-      const response = await fetch(`${API_BASE_URL}/products?cid=${user.cid}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`,
-        },
-      });
-      if (!response.ok) throw new Error(`Unable to fetch all products. Status: ${response.status}`);
-      const data = await response.json();
-      const sortedProducts = (data.products || []).map(product => ({
-        id: product.id,
-        name: product.product_name || product.name || 'N/A',
-        category: product.category_name || product.category || 'N/A',
-        category_id: product.category_id || null,
-        hscode: product.hscode || 'N/A',
-        description: product.description || 'N/A',
-        display_name: product.product_name || product.name || 'N/A',
-        display_hscode: product.hscode || 'N/A',
-        primary_unit: product.primary_unit ? product.primary_unit.replace(/,$/, '') : 'N/A',
-        secondary_unit: product.secondary_unit ? product.secondary_unit.replace(/,$/, '') : 'N/A',
-        c_factor: product.c_factor || 'N/A',
-        p_unit_id: product.p_unit,
-        s_unit_id: product.s_unit,
-      })).sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
-      setAllProducts(sortedProducts);
-      if (sortedProducts.length === 0) {
-        showToast('No products found.', false);
-      }
-    } catch (error) {
-      console.error('Error fetching all products:', error);
-      showToast('Something went wrong while fetching all products.', true);
-      setAllProducts([]);
-    }
-  };
-
-  // Fetch Categories
-  const fetchCategories = async () => {
-    if (!authToken) {
-      showToast('You need to log in to view categories.', true);
-      return [];
-    }
-    try {
-      const response = await fetch(`${API_BASE_URL}/categories`, {
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`,
-        },
-      });
-      if (!response.ok) throw new Error('Unable to fetch categories.');
-      const data = await response.json();
-      const categories = Array.isArray(data.categories) ? data.categories : [];
-      return categories;
-    } catch (error) {
-      console.error('Error fetching categories:', error);
-      showToast('Couldn’t load categories. Please try again later.', true);
-      return [];
-    }
-  };
-
-  // Fetch Units
-  const fetchUnits = async () => {
-    if (!authToken) {
-      showToast('You need to log in to fetch units.', true);
-      return [];
-    }
-    try {
-      const response = await fetch(`${API_BASE_URL}/units`, {
+      const res = await fetch(`${API_BASE_URL}/products?cid=${user.cid}`, {
         headers: {
           Authorization: `Bearer ${authToken}`,
           'Content-Type': 'application/json',
-          Accept: 'application/json',
         },
       });
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Unable to fetch units: ${response.status}`);
-      }
-      const data = await response.json();
-      const fetchedUnits = Array.isArray(data.units) ? data.units : Array.isArray(data) ? data : [];
-      const sortedUnits = fetchedUnits.sort((a, b) =>
-        a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+      if (!res.ok) throw new Error(`Products fetch error ${res.status}`);
+      const json = await res.json();
+      const list = (json.products || []).map((p) => ({
+        id: p.id,
+        name: p.product_name || p.name || 'N/A',
+        category: p.category_name || p.category || 'N/A',
+        category_id: p.category_id || null,
+        hscode: p.hscode || 'N/A',
+        description: p.description || 'N/A',
+        display_name: p.product_name || p.name || 'N/A',
+        display_hscode: p.hscode || 'N/A',
+        primary_unit: p.primary_unit?.replace(/,$/, '') || 'N/A',
+        secondary_unit: p.secondary_unit?.replace(/,$/, '') || 'N/A',
+        c_factor: p.c_factor || 'N/A',
+        p_unit_id: p.p_unit,
+        s_unit_id: p.s_unit,
+      })).sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
       );
-      return sortedUnits;
-    } catch (error) {
-      console.error('Error fetching units:', error);
-      showToast('Couldn’t load units. Please try again later.', true);
+      setAllProducts(list);
+    } catch (e) {
+      console.error('Products fetch error:', e);
+      showToast('Failed to load products.', true);
+    }
+  }, [authToken, user?.cid, showToast]);
+
+  const fetchCategories = useCallback(async () => {
+    if (!authToken) {
+      showToast('No authentication token available.', true);
       return [];
     }
-  };
+    try {
+      const res = await fetch(`${API_BASE_URL}/categories`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      if (!res.ok) throw new Error(`Categories fetch error ${res.status}`);
+      const json = await res.json();
+      const list = Array.isArray(json.categories) ? json.categories : [];
+      return list.sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+      );
+    } catch (e) {
+      console.error('Categories fetch error:', e);
+      showToast('Failed to load categories.', true);
+      return [];
+    }
+  }, [authToken, showToast]);
 
-  // Filter Products
+  const fetchUnits = useCallback(async () => {
+    if (!authToken) {
+      showToast('No authentication token available.', true);
+      return [];
+    }
+    try {
+      const res = await fetch(`${API_BASE_URL}/units`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      if (!res.ok) throw new Error(`Units fetch error ${res.status}`);
+      const json = await res.json();
+      const list = Array.isArray(json.units)
+        ? json.units
+        : Array.isArray(json)
+        ? json
+        : [];
+      return list.sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+      );
+    } catch (e) {
+      console.error('Units fetch error:', e);
+      showToast('Failed to load units.', true);
+      return [];
+    }
+  }, [authToken, showToast]);
+
+  /* ────────────────────── FILTERS ────────────────────── */
   const filteredProducts = useMemo(() => {
     return allProducts
-      .filter(product => {
-        const matchesSearch =
-          product.display_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          product.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          product.display_hscode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          product.description.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesCategory = !categoryFilter || String(product.category_id) === String(categoryFilter);
-        return matchesSearch && matchesCategory;
+      .filter((p) => {
+        const s = searchTerm.toLowerCase();
+        const matchSearch =
+          p.display_name.toLowerCase().includes(s) ||
+          p.category.toLowerCase().includes(s) ||
+          p.display_hscode.toLowerCase().includes(s) ||
+          p.description.toLowerCase().includes(s);
+        const matchCat = !categoryFilter || String(p.category_id) === categoryFilter;
+        return matchSearch && matchCat;
       })
-      .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+      .sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+      );
   }, [allProducts, searchTerm, categoryFilter]);
 
-  // Filter Units
   const filteredUnits = useMemo(() => {
     return units
-      .filter(unit => unit.name.toLowerCase().includes(unitSearchTerm.toLowerCase()))
-      .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+      .filter((u) => u.name.toLowerCase().includes(unitSearchTerm.toLowerCase()))
+      .sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+      );
   }, [units, unitSearchTerm]);
 
-  // Pagination
-  const paginate = (items, page) => {
+  /* ────────────────────── PAGINATION ────────────────────── */
+  const paginate = (list, page) => {
     const start = (page - 1) * itemsPerPage;
-    return items.slice(start, start + itemsPerPage);
+    return list.slice(start, start + itemsPerPage);
   };
 
   const Pagination = ({ total, page, type }) => {
     const totalPages = Math.ceil(total / itemsPerPage);
-    const maxPagesToShow = 5;
-    let startPage = Math.max(1, page - 2);
-    let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
-    if (endPage < startPage + maxPagesToShow - 1) {
-      startPage = Math.max(1, endPage - maxPagesToShow + 1);
-    }
-
+    const max = 5;
+    let start = Math.max(1, page - 2);
+    let end = Math.min(totalPages, start + max - 1);
+    if (end - start + 1 < max) start = Math.max(1, end - max + 1);
     const pages = [];
-    for (let i = startPage; i <= endPage; i++) pages.push(i);
+    for (let i = start; i <= end; i++) pages.push(i);
 
     return (
       <div className="flex items-center justify-center space-x-2 mt-4">
         <button
           className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50 text-sm sm:text-base"
           disabled={page === 1 || total === 0}
-          onClick={() => type === 'products' ? setAllProductsCurrentPage(page - 1) : setUnitsCurrentPage(page - 1)}
+          onClick={() =>
+            type === 'products'
+              ? setAllProductsCurrentPage(page - 1)
+              : setUnitsCurrentPage(page - 1)
+          }
         >
           Previous
         </button>
+
         {total > 0 ? (
-          pages.map(p => (
+          pages.map((p) => (
             <button
               key={p}
-              className={`px-3 py-1 rounded ${p === page ? 'bg-cyan-800 text-white' : 'bg-gray-200'} text-sm sm:text-base`}
-              onClick={() => type === 'products' ? setAllProductsCurrentPage(p) : setUnitsCurrentPage(p)}
+              className={`px-3 py-1 rounded ${
+                p === page ? 'bg-cyan-800 text-white' : 'bg-gray-200'
+              } text-sm sm:text-base`}
+              onClick={() =>
+                type === 'products'
+                  ? setAllProductsCurrentPage(p)
+                  : setUnitsCurrentPage(p)
+              }
             >
               {p}
             </button>
           ))
         ) : (
-          <button className="px-3 py-1 bg-cyan-800 text-white rounded text-sm sm:text-base" disabled>1</button>
+          <button
+            className="px-3 py-1 bg-cyan-800 text-white rounded text-sm sm:text-base"
+            disabled
+          >
+            1
+          </button>
         )}
+
         <button
           className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50 text-sm sm:text-base"
           disabled={page === totalPages || total === 0}
-          onClick={() => type === 'products' ? setAllProductsCurrentPage(page + 1) : setUnitsCurrentPage(page + 1)}
+          onClick={() =>
+            type === 'products'
+              ? setAllProductsCurrentPage(page + 1)
+              : setUnitsCurrentPage(page + 1)
+          }
         >
           Next
         </button>
@@ -288,8 +300,8 @@ const Products = () => {
     );
   };
 
-  // Start Editing
-  const startEdit = (product) => {
+  /* ────────────────────── EDIT PRODUCT ────────────────────── */
+  const startEdit = useCallback((product) => {
     setEditingId(product.id);
     setEditForm({
       name: product.display_name || '',
@@ -300,16 +312,18 @@ const Products = () => {
       c_factor: product.c_factor === 'N/A' ? '' : product.c_factor,
       description: product.description || '',
     });
-  };
+  }, []);
 
-  const cancelEdit = () => {
+  const cancelEdit = useCallback(() => {
     setEditingId(null);
     setEditForm({});
-  };
+  }, []);
 
-  // Save Edit
-  const saveEdit = async () => {
-    if (!editingId) return;
+  const saveEdit = useCallback(async () => {
+    if (!editingId) {
+      showToast('No product selected for editing.', true);
+      return;
+    }
 
     const payload = {
       name: editForm.name?.trim(),
@@ -322,7 +336,7 @@ const Products = () => {
     };
 
     try {
-      const response = await fetch(`${API_BASE_URL}/products/${editingId}`, {
+      const res = await fetch(`${API_BASE_URL}/products/${editingId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -330,126 +344,159 @@ const Products = () => {
         },
         body: JSON.stringify(payload),
       });
-      const responseText = await response.text();
-      if (response.ok) {
-        showToast('Product updated successfully!');
-        const updatedProduct = JSON.parse(responseText).product;
-        setAllProducts(prev =>
-          prev.map(p =>
-            p.id === editingId
-              ? {
-                  ...p,
-                  name: updatedProduct.name,
-                  category_id: updatedProduct.category_id,
-                  category: categories.find(cat => cat.id === updatedProduct.category_id)?.name || 'N/A',
-                  hscode: updatedProduct.hscode,
-                  description: updatedProduct.description || 'N/A',
-                  primary_unit: units.find(unit => unit.id === updatedProduct.p_unit)?.name || 'N/A',
-                  secondary_unit: units.find(unit => unit.id === updatedProduct.s_unit)?.name || 'N/A',
-                  c_factor: updatedProduct.c_factor || 'N/A',
-                  display_name: updatedProduct.name || 'N/A',
-                  display_hscode: updatedProduct.hscode || 'N/A',
-                  p_unit_id: updatedProduct.p_unit,
-                  s_unit_id: updatedProduct.s_unit,
-                }
-              : p
-          ).sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()))
+      const txt = await res.text();
+      if (res.ok) {
+        const updated = JSON.parse(txt).product;
+        setAllProducts((prev) =>
+          prev
+            .map((p) =>
+              p.id === editingId
+                ? {
+                    ...p,
+                    name: updated.name,
+                    category_id: updated.category_id,
+                    category:
+                      categories.find((c) => c.id === updated.category_id)?.name ||
+                      'N/A',
+                    hscode: updated.hscode,
+                    description: updated.description || 'N/A',
+                    primary_unit:
+                      units.find((u) => u.id === updated.p_unit)?.name || 'N/A',
+                    secondary_unit:
+                      units.find((u) => u.id === updated.s_unit)?.name || 'N/A',
+                    c_factor: updated.c_factor || 'N/A',
+                    display_name: updated.name || 'N/A',
+                    display_hscode: updated.hscode || 'N/A',
+                    p_unit_id: updated.p_unit,
+                    s_unit_id: updated.s_unit,
+                  }
+                : p
+            )
+            .sort((a, b) =>
+              a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+            )
         );
+        showToast('Product updated!');
         cancelEdit();
       } else {
-        let errorMessage = 'Couldn’t update the product.';
+        let msg = 'Update failed.';
         try {
-          const errorData = JSON.parse(responseText);
-          if (errorData.errors) {
-            const messages = Object.entries(errorData.errors).flatMap(([field, errs]) =>
-              errs.map(err => `${field}: ${err}`)
-            );
-            errorMessage = messages.join('; ');
-          } else if (errorData.message) {
-            errorMessage = errorData.message;
-          } else {
-            errorMessage = responseText;
-          }
-        } catch (e) {
-          errorMessage = responseText || 'Unknown server error.';
+          const err = JSON.parse(txt);
+          msg = err.errors
+            ? Object.entries(err.errors)
+                .flatMap(([k, v]) => v.map((e) => `${k}: ${e}`))
+                .join('; ')
+            : err.message || txt;
+        } catch (parseErr) {
+          console.error('Error parsing response:', parseErr);
         }
-        showToast(`Failed to update product: ${errorMessage}`, true);
+        showToast(`Update error: ${msg}`, true);
       }
-    } catch (error) {
-      showToast(`Couldn’t update product: ${error.message}`, true);
+    } catch (e) {
+      console.error('Product update error:', e);
+      showToast(`Update error: ${e.message}`, true);
     }
-  };
+  }, [editingId, editForm, authToken, categories, units, showToast, cancelEdit]);
 
-  // Display Products
+  /* ────────────────────── DISPLAY PRODUCTS ────────────────────── */
   const displayProducts = () => {
-    const paginatedProducts = paginate(filteredProducts, allProductsCurrentPage);
-    const showActions = user && user.rid <= 7;
+    const paginated = paginate(filteredProducts, allProductsCurrentPage);
+    const canEdit = user?.rid <= 7;
 
     if (isMobile) {
       return (
         <div className="space-y-4">
-          {paginatedProducts.length === 0 ? (
-            <div className="text-center py-6 text-sm text-cyan-700">
-              {filteredProducts.length > 0 ? 'No products on this page' : 'No products available'}
-            </div>
+          {paginated.length === 0 ? (
+            <p className="text-center py-6 text-sm text-cyan-700">
+              {filteredProducts.length > 0
+                ? 'No products on this page'
+                : 'No products available'}
+            </p>
           ) : (
-            paginatedProducts.map((product, index) => {
-              const isEditing = editingId === product.id;
-              const idx = (allProductsCurrentPage - 1) * itemsPerPage + index + 1;
+            paginated.map((p, i) => {
+              const editing = editingId === p.id;
+              const idx = (allProductsCurrentPage - 1) * itemsPerPage + i + 1;
 
               return (
-                <div key={product.id} className="bg-white border rounded-lg p-4 shadow-sm">
-                  {isEditing ? (
+                <div
+                  key={p.id}
+                  className="bg-white border rounded-lg p-4 shadow-sm"
+                >
+                  {editing ? (
+                    /* ── EDIT FORM (mobile) ── */
                     <div className="space-y-3">
                       <input
-                        type="text"
                         className="w-full border rounded px-2 py-1 text-sm"
                         value={editForm.name || ''}
-                        onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                        onChange={(e) =>
+                          setEditForm({ ...editForm, name: e.target.value })
+                        }
                         placeholder="Product Name *"
                         required
                       />
                       <select
                         className="w-full border rounded px-2 py-1 text-sm"
                         value={editForm.category_id || ''}
-                        onChange={e => setEditForm({ ...editForm, category_id: e.target.value })}
+                        onChange={(e) =>
+                          setEditForm({
+                            ...editForm,
+                            category_id: e.target.value,
+                          })
+                        }
                       >
-                        <option value="" disabled>Select Category</option>
-                        {categories.map(category => (
-                          <option key={category.id} value={category.id}>{category.name}</option>
+                        <option value="" disabled>
+                          Select Category
+                        </option>
+                        {categories.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
                         ))}
                       </select>
                       <input
-                        type="text"
                         className="w-full border rounded px-2 py-1 text-sm"
                         value={editForm.hscode || ''}
-                        onChange={e => setEditForm({ ...editForm, hscode: e.target.value })}
+                        onChange={(e) =>
+                          setEditForm({ ...editForm, hscode: e.target.value })
+                        }
                         placeholder="HSCODE"
                       />
                       <select
                         className="w-full border rounded px-2 py-1 text-sm"
                         value={editForm.p_unit || ''}
-                        onChange={e => {
+                        onChange={(e) => {
                           setEditForm({ ...editForm, p_unit: e.target.value });
-                          showUnitConversionPopup(units.find(u => u.id == e.target.value));
+                          showUnitConversionPopup(
+                            units.find((u) => u.id == e.target.value)
+                          );
                         }}
                       >
-                        <option value="" disabled>Select Primary Unit</option>
-                        {units.map(unit => (
-                          <option key={unit.id} value={unit.id}>{unit.name}</option>
+                        <option value="" disabled>
+                          Primary Unit
+                        </option>
+                        {units.map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.name}
+                          </option>
                         ))}
                       </select>
                       <select
                         className="w-full border rounded px-2 py-1 text-sm"
                         value={editForm.s_unit || ''}
-                        onChange={e => {
+                        onChange={(e) => {
                           setEditForm({ ...editForm, s_unit: e.target.value });
-                          showUnitConversionPopup(units.find(u => u.id == e.target.value));
+                          showUnitConversionPopup(
+                            units.find((u) => u.id == e.target.value)
+                          );
                         }}
                       >
-                        <option value="" disabled>Select Secondary Unit</option>
-                        {units.map(unit => (
-                          <option key={unit.id} value={unit.id}>{unit.name}</option>
+                        <option value="" disabled>
+                          Secondary Unit
+                        </option>
+                        {units.map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.name}
+                          </option>
                         ))}
                       </select>
                       <input
@@ -457,93 +504,157 @@ const Products = () => {
                         step="any"
                         className="w-full border rounded px-2 py-1 text-sm"
                         value={editForm.c_factor || ''}
-                        onChange={e => setEditForm({ ...editForm, c_factor: e.target.value })}
+                        onChange={(e) =>
+                          setEditForm({
+                            ...editForm,
+                            c_factor: e.target.value,
+                          })
+                        }
                         placeholder="Conversion Factor"
                       />
                       <input
-                        type="text"
                         className="w-full border rounded px-2 py-1 text-sm"
                         value={editForm.description || ''}
-                        onChange={e => setEditForm({ ...editForm, description: e.target.value })}
+                        onChange={(e) =>
+                          setEditForm({
+                            ...editForm,
+                            description: e.target.value,
+                          })
+                        }
                         placeholder="Description"
                       />
                       <div className="flex space-x-2">
-                        <button className="flex-1 px-3 py-1 bg-cyan-700 text-white rounded text-sm" onClick={saveEdit}>Save</button>
-                        <button className="flex-1 px-3 py-1 bg-gray-500 text-white rounded text-sm" onClick={cancelEdit}>Cancel</button>
+                        <button
+                          className="flex-1 px-3 py-1 bg-cyan-700 text-white rounded text-sm"
+                          onClick={saveEdit}
+                        >
+                          Save
+                        </button>
+                        <button
+                          className="flex-1 px-3 py-1 bg-gray-500 text-white rounded text-sm"
+                          onClick={cancelEdit}
+                        >
+                          Cancel
+                        </button>
                       </div>
                     </div>
                   ) : (
+                    /* ── VIEW (mobile) ── */
                     <div className="flex flex-col gap-2 text-sm">
                       <div className="flex justify-between items-start">
                         <div className="font-semibold text-base">
-                          {idx}. {product.display_name || 'N/A'}
+                          {idx}. {p.display_name || 'N/A'}
                         </div>
-                        {showActions && (
+                        {canEdit && (
                           <button
                             className="px-2 py-1 bg-cyan-800 text-white rounded text-xs hover:bg-red-500"
-                            onClick={() => startEdit(product)}
+                            onClick={() => startEdit(p)}
                           >
-                            Edit
+                          Edit
                           </button>
                         )}
                       </div>
-                      <div><strong>Category:</strong> {product.category || 'N/A'}</div>
-                      <div><strong>HScode:</strong> {product.display_hscode || 'N/A'}</div>
-                      <div><strong>P. Unit:</strong> {product.primary_unit || 'N/A'}</div>
-                      <div><strong>S. Unit:</strong> {product.secondary_unit || 'N/A'}</div>
-                      <div><strong>CF:</strong> {product.c_factor || 'N/A'}</div>
-                      <div><strong>Description :</strong> {product.description || 'N/A'}</div>
+                      <div>
+                        <strong>Category:</strong> {p.category || 'N/A'}
+                      </div>
+                      <div>
+                        <strong>HScode:</strong> {p.display_hscode || 'N/A'}
+                      </div>
+                      <div>
+                        <strong>P. Unit:</strong> {p.primary_unit || 'N/A'}
+                      </div>
+                      <div>
+                        <strong>S. Unit:</strong> {p.secondary_unit || 'N/A'}
+                      </div>
+                      <div>
+                        <strong>CF:</strong> {p.c_factor || 'N/A'}
+                      </div>
+                      <div>
+                        <strong>Description:</strong> {p.description || 'N/A'}
+                      </div>
                     </div>
                   )}
                 </div>
               );
             })
           )}
-          <Pagination total={filteredProducts.length} page={allProductsCurrentPage} type="products" />
+          <Pagination
+            total={filteredProducts.length}
+            page={allProductsCurrentPage}
+            type="products"
+          />
         </div>
       );
     }
 
+    /* ── DESKTOP TABLE ── */
     return (
       <div className="overflow-x-auto">
         <table className="min-w-full bg-white border">
           <thead>
             <tr>
-              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">S.No</th>
-              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">Product Name</th>
-              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">Category</th>
-              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">HScode</th>
-              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">P. Unit</th>
-              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">S. Unit</th>
-              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">CF</th>
-              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">Description</th>
-              {showActions && <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">Actions</th>}
+              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
+                S.No
+              </th>
+              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
+                Product Name
+              </th>
+              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
+                Category
+              </th>
+              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
+                HScode
+              </th>
+              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
+                P. Unit
+              </th>
+              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
+                S. Unit
+              </th>
+              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
+                CF
+              </th>
+              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
+                Description
+              </th>
+              {canEdit && (
+                <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
+                  Actions
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
-            {paginatedProducts.length === 0 ? (
+            {paginated.length === 0 ? (
               <tr>
-                <td colSpan={showActions ? 9 : 8} className="py-2 px-3 sm:px-4 border text-center text-sm sm:text-base">
-                  {filteredProducts.length > 0 ? 'No products on this page' : 'No products available'}
+                <td
+                  colSpan={canEdit ? 9 : 8}
+                  className="py-2 px-3 sm:px-4 border text-center text-sm sm:text-base"
+                >
+                  {filteredProducts.length > 0
+                    ? 'No products on this page'
+                    : 'No products available'}
                 </td>
               </tr>
             ) : (
-              paginatedProducts.map((product, index) => {
-                const isEditing = editingId === product.id;
-                const idx = (allProductsCurrentPage - 1) * itemsPerPage + index + 1;
+              paginated.map((p, i) => {
+                const editing = editingId === p.id;
+                const idx = (allProductsCurrentPage - 1) * itemsPerPage + i + 1;
 
                 return (
-                  <tr key={product.id}>
-                    <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">{idx}</td>
-
-                    {isEditing ? (
+                  <tr key={p.id}>
+                    <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
+                      {idx}
+                    </td>
+                    {editing ? (
                       <>
                         <td className="py-2 px-3 sm:px-4 border">
                           <input
-                            type="text"
                             className="w-full border rounded px-2 py-1 text-sm sm:text-base"
                             value={editForm.name || ''}
-                            onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                            onChange={(e) =>
+                              setEditForm({ ...editForm, name: e.target.value })
+                            }
                             required
                           />
                         </td>
@@ -551,35 +662,54 @@ const Products = () => {
                           <select
                             className="w-full border rounded px-2 py-1 text-sm sm:text-base"
                             value={editForm.category_id || ''}
-                            onChange={e => setEditForm({ ...editForm, category_id: e.target.value })}
+                            onChange={(e) =>
+                              setEditForm({
+                                ...editForm,
+                                category_id: e.target.value,
+                              })
+                            }
                             required
                           >
-                            <option value="" disabled>Select Category</option>
-                            {categories.map(category => (
-                              <option key={category.id} value={category.id}>{category.name}</option>
+                            <option value="" disabled>
+                              Select Category
+                            </option>
+                            {categories.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.name}
+                              </option>
                             ))}
                           </select>
                         </td>
                         <td className="py-2 px-3 sm:px-4 border">
                           <input
-                            type="text"
                             className="w-full border rounded px-2 py-1 text-sm sm:text-base"
                             value={editForm.hscode || ''}
-                            onChange={e => setEditForm({ ...editForm, hscode: e.target.value })}
+                            onChange={(e) =>
+                              setEditForm({
+                                ...editForm,
+                                hscode: e.target.value,
+                              })
+                            }
                           />
                         </td>
                         <td className="py-2 px-3 sm:px-4 border">
                           <select
                             className="w-full border rounded px-2 py-1 text-sm sm:text-base"
                             value={editForm.p_unit || ''}
-                            onChange={e => {
+                            onChange={(e) => {
                               setEditForm({ ...editForm, p_unit: e.target.value });
-                              showUnitConversionPopup(units.find(u => u.id == e.target.value));
+                              showUnitConversionPopup(
+                                units.find((u) => u.id == e.target.value)
+                              );
                             }}
                           >
-                            <option value="" disabled>Select Primary Unit</option>
-                            {units.map(unit => (
-                              <option key={unit.id} value={unit.id}>{unit.name}</option>
+                            <option value="" disabled>
+                              Primary Unit
+                            </option>
+                            {units.map((u) => (
+                              <option key={u.id} value={u.id}>
+                                {u.name}
+                              </option>
                             ))}
                           </select>
                         </td>
@@ -587,14 +717,20 @@ const Products = () => {
                           <select
                             className="w-full border rounded px-2 py-1 text-sm sm:text-base"
                             value={editForm.s_unit || ''}
-                            onChange={e => {
+                            onChange={(e) => {
                               setEditForm({ ...editForm, s_unit: e.target.value });
-                              showUnitConversionPopup(units.find(u => u.id == e.target.value));
+                              showUnitConversionPopup(
+                                units.find((u) => u.id == e.target.value)
+                              );
                             }}
                           >
-                            <option value="" disabled>Select Secondary Unit</option>
-                            {units.map(unit => (
-                              <option key={unit.id} value={unit.id}>{unit.name}</option>
+                            <option value="" disabled>
+                              Secondary Unit
+                            </option>
+                            {units.map((u) => (
+                              <option key={u.id} value={u.id}>
+                                {u.name}
+                              </option>
                             ))}
                           </select>
                         </td>
@@ -604,26 +740,35 @@ const Products = () => {
                             step="any"
                             className="w-full border rounded px-2 py-1 text-sm sm:text-base"
                             value={editForm.c_factor || ''}
-                            onChange={e => setEditForm({ ...editForm, c_factor: e.target.value })}
+                            onChange={(e) =>
+                              setEditForm({
+                                ...editForm,
+                                c_factor: e.target.value,
+                              })
+                            }
                           />
                         </td>
                         <td className="py-2 px-3 sm:px-4 border">
                           <input
-                            type="text"
                             className="w-full border rounded px-2 py-1 text-sm sm:text-base"
                             value={editForm.description || ''}
-                            onChange={e => setEditForm({ ...editForm, description: e.target.value })}
+                            onChange={(e) =>
+                              setEditForm({
+                                ...editForm,
+                                description: e.target.value,
+                              })
+                            }
                           />
                         </td>
                         <td className="py-2 px-3 sm:px-4 border">
                           <button
-                            className="px-2 py-1 bg-cyan-700 text-white rounded text-xs mr-1"
+                            className="px-2 py-1 bg-cyan-700 text-white rounded text-xs"
                             onClick={saveEdit}
                           >
                             Save
                           </button>
                           <button
-                            className="px-2 py-1 bg-gray-500 text-white rounded text-xs"
+                            className="px-2 py-1 bg-gray-500 text-white rounded text-xs ml-1"
                             onClick={cancelEdit}
                           >
                             Cancel
@@ -632,18 +777,32 @@ const Products = () => {
                       </>
                     ) : (
                       <>
-                        <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">{product.display_name || 'N/A'}</td>
-                        <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">{product.category || 'N/A'}</td>
-                        <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">{product.display_hscode || 'N/A'}</td>
-                        <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">{product.primary_unit || 'N/A'}</td>
-                        <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">{product.secondary_unit || 'N/A'}</td>
-                        <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">{product.c_factor || 'N/A'}</td>
-                        <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">{product.description || 'N/A'}</td>
-                        {showActions && (
+                        <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
+                          {p.display_name || 'N/A'}
+                        </td>
+                        <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
+                          {p.category || 'N/A'}
+                        </td>
+                        <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
+                          {p.display_hscode || 'N/A'}
+                        </td>
+                        <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
+                          {p.primary_unit || 'N/A'}
+                        </td>
+                        <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
+                          {p.secondary_unit || 'N/A'}
+                        </td>
+                        <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
+                          {p.c_factor || 'N/A'}
+                        </td>
+                        <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
+                          {p.description || 'N/A'}
+                        </td>
+                        {canEdit && (
                           <td className="py-2 px-3 sm:px-4 border">
                             <button
                               className="px-2 py-1 bg-cyan-800 text-white rounded text-xs"
-                              onClick={() => startEdit(product)}
+                              onClick={() => startEdit(p)}
                             >
                               Edit
                             </button>
@@ -657,196 +816,193 @@ const Products = () => {
             )}
           </tbody>
         </table>
-        <Pagination total={filteredProducts.length} page={allProductsCurrentPage} type="products" />
+        <Pagination
+          total={filteredProducts.length}
+          page={allProductsCurrentPage}
+          type="products"
+        />
       </div>
     );
   };
 
-  // Display Units
+  /* ────────────────────── DISPLAY UNITS ────────────────────── */
   const displayUnits = () => {
-    const paginatedUnits = paginate(filteredUnits, unitsCurrentPage);
+    const paginated = paginate(filteredUnits, unitsCurrentPage);
 
     return (
       <div className="overflow-x-auto">
         <table className="min-w-full bg-white border">
           <thead>
             <tr>
-              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">S.No</th>
-              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">Unit Name</th>
-              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">Actions</th>
+              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
+                S.No
+              </th>
+              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
+                Unit Name
+              </th>
+              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody>
-            {paginatedUnits.length === 0 ? (
+            {paginated.length === 0 ? (
               <tr>
-                <td colSpan={3} className="py-2 px-3 sm:px-4 border text-center text-sm sm:text-base">
-                  {filteredUnits.length > 0 ? 'No units on this page' : 'No units available'}
+                <td
+                  colSpan={3}
+                  className="py-2 px-3 sm:px-4 border text-center text-sm sm:text-base"
+                >
+                  {filteredUnits.length > 0
+                    ? 'No units on this page'
+                    : 'No units available'}
                 </td>
               </tr>
             ) : (
-              paginatedUnits.map((unit, index) => (
-                <tr key={unit.id}>
+              paginated.map((u, i) => (
+                <tr key={u.id}>
                   <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
-                    {(unitsCurrentPage - 1) * itemsPerPage + index + 1}
+                    {(unitsCurrentPage - 1) * itemsPerPage + i + 1}
                   </td>
-                  <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">{unit.name}</td>
+                  <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
+                    {u.name}
+                  </td>
                   <td className="py-2 px-3 sm:px-4 border">
-                    <button className="px-2 py-1 bg-cyan-800 text-white rounded text-xs">Edit</button>
+                    <button className="px-2 py-1 bg-cyan-800 text-white rounded text-xs">
+                      Edit
+                    </button>
                   </td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
-        <Pagination total={filteredUnits.length} page={unitsCurrentPage} type="units" />
+        <Pagination
+          total={filteredUnits.length}
+          page={unitsCurrentPage}
+          type="units"
+        />
       </div>
     );
   };
 
-  // Add Product Popup
+  /* ────────────────────── ADD PRODUCT POPUP ────────────────────── */
   const AddProductPopup = () => {
     const [productRows, setProductRows] = useState([
-      { id: 1, name: '', category_id: '', hscode: '', p_unit: '', s_unit: '', c_factor: '', description: '' },
+      {
+        id: 1,
+        name: '',
+        category_id: '',
+        hscode: '',
+        p_unit: '',
+        s_unit: '',
+        c_factor: '',
+        description: '',
+      },
     ]);
-    const inputRefs = useRef([]);
 
     const handleAddRow = () => {
-      setProductRows([...productRows, {
-        id: productRows.length + 1,
-        name: '', category_id: '', hscode: '', p_unit: '', s_unit: '', c_factor: '', description: ''
-      }]);
+      setProductRows((prev) => [
+        ...prev,
+        {
+          id: prev.length + 1,
+          name: '',
+          category_id: '',
+          hscode: '',
+          p_unit: '',
+          s_unit: '',
+          c_factor: '',
+          description: '',
+        },
+      ]);
     };
 
     const handleRemoveRow = (id) => {
-      setProductRows(productRows.filter(row => row.id !== id));
+      setProductRows((prev) => prev.filter((r) => r.id !== id));
     };
 
     const handleInputChange = (id, field, value) => {
-      setProductRows(productRows.map(row =>
-        row.id === id ? { ...row, [field]: value } : row
-      ));
+      setProductRows((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, [field]: value } : r))
+      );
       if (field === 'p_unit' || field === 's_unit') {
-        const selectedUnit = units.find(unit => unit.id == value);
-        showUnitConversionPopup(selectedUnit);
+        const unit = units.find((u) => u.id == value);
+        showUnitConversionPopup(unit);
       }
     };
 
-    useEffect(() => {
-      if (isMobile) return;
-      productRows.forEach((row, index) => {
-        const input = inputRefs.current[index];
-        if (!input) return;
-
-        const wrapper = input.parentNode;
-        let suggestionList = wrapper.querySelector('ul');
-        if (!suggestionList) {
-          suggestionList = document.createElement('ul');
-          suggestionList.style.cssText = `
-            position: absolute; top: 100%; left: 0; right: 0; background: white;
-            border: 1px solid #ddd; border-radius: 4px; list-style: none; margin: 0; padding: 0;
-            z-index: 1000; max-height: 150px; overflow-y: auto; display: none;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-          `;
-          wrapper.appendChild(suggestionList);
-        }
-
-        const showSuggestions = (query) => {
-          suggestionList.innerHTML = '';
-          if (query.length < 1) {
-            suggestionList.style.display = 'none';
-            return;
-          }
-          const filteredProducts = allProducts
-            .filter(product => product.display_name.toLowerCase().includes(query.toLowerCase()))
-            .slice(0, 5);
-          if (filteredProducts.length > 0) {
-            filteredProducts.forEach(product => {
-              const li = document.createElement('li');
-              li.style.cssText = 'padding: 8px 12px; cursor: pointer; transition: background-color 0.2s;';
-              li.textContent = product.display_name;
-              li.addEventListener('mouseover', () => li.style.backgroundColor = '#f0f0f0');
-              li.addEventListener('mouseout', () => li.style.backgroundColor = 'white');
-              li.addEventListener('click', () => {
-                input.value = product.display_name;
-                handleInputChange(row.id, 'name', product.display_name);
-                suggestionList.innerHTML = '';
-                suggestionList.style.display = 'none';
-              });
-              suggestionList.appendChild(li);
-            });
-            suggestionList.style.display = 'block';
-          } else {
-            suggestionList.style.display = 'none';
-          }
-        };
-
-        const handleInput = () => showSuggestions(input.value.trim());
-        const handleBlur = () => setTimeout(() => suggestionList.style.display = 'none', 200);
-        const handleFocus = () => input.value.trim().length > 0 && showSuggestions(input.value.trim());
-
-        input.addEventListener('input', handleInput);
-        input.addEventListener('blur', handleBlur);
-        input.addEventListener('focus', handleFocus);
-
-        return () => {
-          input.removeEventListener('input', handleInput);
-          input.removeEventListener('blur', handleBlur);
-          input.removeEventListener('focus', handleFocus);
-        };
-      });
-    }, [productRows, isMobile, allProducts]);
-
     const handleSubmit = async (e) => {
       e.preventDefault();
+
       if (!user || !authToken) {
         showToast('You need to log in to add products.', true);
         navigate('/login');
         return;
       }
-      let hasError = false;
 
-      const products = productRows.map(row => ({
-        name: row.name.trim(),
-        category_id: row.category_id ? parseInt(row.category_id, 10) : null,
-        hscode: row.hscode ? row.hscode.trim() : null,
-        p_unit: row.p_unit ? parseInt(row.p_unit, 10) : null,
-        s_unit: row.s_unit ? parseInt(row.s_unit, 10) : null,
-        c_factor: row.c_factor ? parseFloat(row.c_factor) : null,
-        description: row.description ? row.description.trim() : null,
+      let hasError = false;
+      const products = productRows.map((r) => ({
+        name: r.name.trim(),
+        category_id: r.category_id ? parseInt(r.category_id, 10) : null,
+        hscode: r.hscode ? r.hscode.trim() : null,
+        p_unit: r.p_unit ? parseInt(r.p_unit, 10) : null,
+        s_unit: r.s_unit ? parseInt(r.s_unit, 10) : null,
+        c_factor: r.c_factor ? parseFloat(r.c_factor) : null,
+        description: r.description ? r.description.trim() : null,
       }));
 
-      products.forEach((product, index) => {
-        if (!product.name) {
-          showToast(`Product ${index + 1}: Name is required.`, true);
+      products.forEach((p, i) => {
+        if (!p.name) {
+          showToast(`Product ${i + 1}: Name is required.`, true);
           hasError = true;
+          return;
         }
-        if (!product.category_id || isNaN(product.category_id)) {
-          showToast(`Product ${index + 1}: Category is required.`, true);
+        if (!p.category_id || isNaN(p.category_id)) {
+          showToast(`Product ${i + 1}: Category is required.`, true);
           hasError = true;
+          return;
         }
-        if (allProducts.some(p => p.display_name.toLowerCase() === product.name.toLowerCase())) {
-          showToast(`Product ${index + 1}: "${product.name}" already exists.`, true);
+        if (
+          allProducts.some(
+            (ap) => ap.display_name.toLowerCase() === p.name.toLowerCase()
+          )
+        ) {
+          showToast(`Product ${i + 1}: "${p.name}" already exists.`, true);
           hasError = true;
+          return;
         }
-        if (product.p_unit && !units.some(u => u.id === product.p_unit)) {
-          showToast(`Product ${index + 1}: Invalid primary unit.`, true);
+        if (p.p_unit && !units.some((u) => u.id === p.p_unit)) {
+          showToast(`Product ${i + 1}: Invalid primary unit.`, true);
           hasError = true;
+          return;
         }
-        if (product.s_unit && !units.some(u => u.id === product.s_unit)) {
-          showToast(`Product ${index + 1}: Invalid secondary unit.`, true);
+        if (p.s_unit && !units.some((u) => u.id === p.s_unit)) {
+          showToast(`Product ${i + 1}: Invalid secondary unit.`, true);
           hasError = true;
+          return;
         }
-        if (product.c_factor && (isNaN(product.c_factor) || product.c_factor <= 0)) {
-          showToast(`Product ${index + 1}: Conversion factor must be a positive number.`, true);
+        if (p.c_factor && (isNaN(p.c_factor) || p.c_factor <= 0)) {
+          showToast(
+            `Product ${i + 1}: Conversion factor must be a positive number.`,
+            true
+          );
           hasError = true;
+          return;
         }
-        if (product.hscode && product.hscode.length > 50) {
-          showToast(`Product ${index + 1}: HSCODE must not exceed 50 characters.`, true);
+        if (p.hscode && p.hscode.length > 50) {
+          showToast(
+            `Product ${i + 1}: HSCODE must not exceed 50 characters.`,
+            true
+          );
           hasError = true;
+          return;
         }
-        if (product.name.length > 255) {
-          showToast(`Product ${index + 1}: Name must not exceed 255 characters.`, true);
+        if (p.name.length > 255) {
+          showToast(
+            `Product ${i + 1}: Name must not exceed 255 characters.`,
+            true
+          );
           hasError = true;
+          return;
         }
       });
 
@@ -857,7 +1013,7 @@ const Products = () => {
       }
 
       try {
-        const response = await fetch(`${API_BASE_URL}/products`, {
+        const res = await fetch(`${API_BASE_URL}/products`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -865,124 +1021,240 @@ const Products = () => {
           },
           body: JSON.stringify({ products }),
         });
-        const responseText = await response.text();
-        if (response.ok) {
+        const txt = await res.text();
+        if (res.ok) {
           showToast('Products saved successfully!', false);
-          const responseData = JSON.parse(responseText);
-          const newProducts = responseData.products || [];
-          const newAllProducts = newProducts.map(newProduct => ({
-            id: newProduct.id,
-            name: newProduct.name,
-            category_id: newProduct.category_id,
-            category: categories.find(cat => cat.id === newProduct.category_id)?.name || 'N/A',
-            hscode: newProduct.hscode,
-            description: newProduct.description || 'N/A',
-            display_name: newProduct.name || 'N/A',
-            display_hscode: newProduct.hscode || 'N/A',
-            primary_unit: units.find(unit => unit.id === newProduct.p_unit)?.name || 'N/A',
-            secondary_unit: units.find(unit => unit.id === newProduct.s_unit)?.name || 'N/A',
-            c_factor: newProduct.c_factor || 'N/A',
-            p_unit_id: newProduct.p_unit,
-            s_unit_id: newProduct.s_unit,
+          const data = JSON.parse(txt);
+          const newProds = (data.products || []).map((np) => ({
+            id: np.id,
+            name: np.name,
+            category_id: np.category_id,
+            category:
+              categories.find((c) => c.id === np.category_id)?.name || 'N/A',
+            hscode: np.hscode,
+            description: np.description || 'N/A',
+            display_name: np.name || 'N/A',
+            display_hscode: np.hscode || 'N/A',
+            primary_unit: units.find((u) => u.id === np.p_unit)?.name || 'N/A',
+            secondary_unit: units.find((u) => u.id === np.s_unit)?.name || 'N/A',
+            c_factor: np.c_factor || 'N/A',
+            p_unit_id: np.p_unit,
+            s_unit_id: np.s_unit,
           }));
-          setAllProducts([...allProducts, ...newAllProducts].sort((a, b) =>
-            a.name.toLowerCase().localeCompare(b.name.toLowerCase())
-          ));
+          setAllProducts((prev) =>
+            [...prev, ...newProds].sort((a, b) =>
+              a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+            )
+          );
           setShowAddProductPopup(false);
         } else {
-          let errorMessage = 'Failed to save products.';
+          let msg = 'Failed to save products.';
           try {
-            const errorData = JSON.parse(responseText);
-            if (errorData.errors) {
-              const messages = Object.entries(errorData.errors).flatMap(([field, errs]) =>
-                errs.map(err => `${field}: ${err}`)
-              );
-              errorMessage = messages.join('; ');
-            } else if (errorData.message) {
-              errorMessage = errorData.message;
-            } else {
-              errorMessage = responseText;
-            }
-          } catch (e) {
-            errorMessage = responseText || 'Unknown server error.';
+            const err = JSON.parse(txt);
+            msg = err.errors
+              ? Object.entries(err.errors)
+                  .flatMap(([k, v]) => v.map((e) => `${k}: ${e}`))
+                  .join('; ')
+              : err.message || txt;
+          } catch (parseErr) {
+            console.error('Error parsing response:', parseErr);
           }
-          showToast(`Failed to save products: ${errorMessage}`, true);
+          showToast(`Failed to save products: ${msg}`, true);
         }
-      } catch (error) {
-        showToast(`Couldn’t save products: ${error.message}`, true);
+      } catch (e) {
+        console.error('Product save error:', e);
+        showToast(`Could not save products: ${e.message}`, true);
       }
     };
 
+    /* ── MOBILE ── */
     if (isMobile) {
       return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 overflow-y-auto">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-4">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-bold">Add New Product</h2>
-              <button onClick={() => setShowAddProductPopup(false)} className="text-cyan-700">
+              <button
+                onClick={() => setShowAddProductPopup(false)}
+                className="text-cyan-700"
+              >
                 Close
               </button>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
-              {productRows.map((row, index) => (
-                <div key={row.id} className="border rounded p-3 space-y-3 relative">
+              {productRows.map((row, i) => (
+                <div
+                  key={row.id}
+                  className="border rounded p-3 space-y-3 relative"
+                >
                   <div className="flex justify-between items-center">
-                    <span className="font-semibold text-sm">Item {index + 1}</span>
+                    <span className="font-semibold text-sm">Item {i + 1}</span>
                     {productRows.length > 1 && (
-                      <button type="button" className="text-red-500 text-xs" onClick={() => handleRemoveRow(row.id)}>Remove</button>
+                      <button
+                        type="button"
+                        className="text-red-500 text-xs"
+                        onClick={() => handleRemoveRow(row.id)}
+                      >
+                        Remove
+                      </button>
                     )}
                   </div>
                   <div>
-                    <label className="block text-xs font-medium mb-1">Product Name *</label>
-                    <input type="text" className="w-full border rounded px-2 py-1 text-sm" placeholder="e.g., Laptop" value={row.name} onChange={e => handleInputChange(row.id, 'name', e.target.value)} required />
+                    <label className="block text-xs font-medium mb-1">
+                      Product Name *
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full border rounded px-2 py-1 text-sm"
+                      placeholder="e.g., Laptop"
+                      value={row.name}
+                      onChange={(e) =>
+                        handleInputChange(row.id, 'name', e.target.value)
+                      }
+                      required
+                    />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium mb-1">Category *</label>
-                    <select className="w-full border rounded px-2 py-1 text-sm" value={row.category_id} onChange={e => handleInputChange(row.id, 'category_id', e.target.value)} required>
-                      <option value="" disabled>Select Category</option>
-                      {categories.map(category => (
-                        <option key={category.id} value={category.id}>{category.name}</option>
+                    <label className="block text-xs font-medium mb-1">
+                      Category *
+                    </label>
+                    <select
+                      className="w-full border rounded px-2 py-1 text-sm"
+                      value={row.category_id}
+                      onChange={(e) =>
+                        handleInputChange(row.id, 'category_id', e.target.value)
+                      }
+                      required
+                    >
+                      <option value="" disabled>
+                        Select Category
+                      </option>
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
                       ))}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium mb-1">HSCODE</label>
-                    <input type="text" className="w-full border rounded px-2 py-1 text-sm" placeholder="e.g., LAP123" value={row.hscode} onChange={e => handleInputChange(row.id, 'hscode', e.target.value)} />
+                    <label className="block text-xs font-medium mb-1">
+                      HSCODE
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full border rounded px-2 py-1 text-sm"
+                      placeholder="e.g., LAP123"
+                      value={row.hscode}
+                      onChange={(e) =>
+                        handleInputChange(row.id, 'hscode', e.target.value)
+                      }
+                    />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium mb-1">Primary Unit</label>
-                    <select className="w-full border rounded px-2 py-1 text-sm" value={row.p_unit} onChange={e => handleInputChange(row.id, 'p_unit', e.target.value)}>
-                      <option value="" disabled>Select Primary Unit</option>
-                      {units.map(unit => (
-                        <option key={unit.id} value={unit.id}>{unit.name}</option>
+                    <label className="block text-xs font-medium mb-1">
+                      Primary Unit
+                    </label>
+                    <select
+                      className="w-full border rounded px-2 py-1 text-sm"
+                      value={row.p_unit}
+                      onChange={(e) =>
+                        handleInputChange(row.id, 'p_unit', e.target.value)
+                      }
+                    >
+                      <option value="" disabled>
+                        Select Primary Unit
+                      </option>
+                      {units.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name}
+                        </option>
                       ))}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium mb-1">Secondary Unit</label>
-                    <select className="w-full border rounded px-2 py-1 text-sm" value={row.s_unit} onChange={e => handleInputChange(row.id, 's_unit', e.target.value)}>
-                      <option value="" disabled>Select Secondary Unit</option>
-                      {units.map(unit => (
-                        <option key={unit.id} value={unit.id}>{unit.name}</option>
+                    <label className="block text-xs font-medium mb-1">
+                      Secondary Unit
+                    </label>
+                    <select
+                      className="w-full border rounded px-2 py-1 text-sm"
+                      value={row.s_unit}
+                      onChange={(e) =>
+                        handleInputChange(row.id, 's_unit', e.target.value)
+                      }
+                    >
+                      <option value="" disabled>
+                        Select Secondary Unit
+                      </option>
+                      {units.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name}
+                        </option>
                       ))}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium mb-1">Conversion Factor</label>
-                    <input type="number" step="any" className="w-full border rounded px-2 py-1 text-sm" placeholder="e.g., 25.5" value={row.c_factor} onChange={e => handleInputChange(row.id, 'c_factor', e.target.value)} />
+                    <label className="block text-xs font-medium mb-1">
+                      Conversion Factor
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      className="w-full border rounded px-2 py-1 text-sm"
+                      placeholder="e.g., 25.5"
+                      value={row.c_factor}
+                      onChange={(e) =>
+                        handleInputChange(row.id, 'c_factor', e.target.value)
+                      }
+                    />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium mb-1">Description</label>
-                    <input type="text" className="w-full border rounded px-2 py-1 text-sm" placeholder="e.g., Product details" value={row.description} onChange={e => handleInputChange(row.id, 'description', e.target.value)} />
+                    <label className="block text-xs font-medium mb-1">
+                      Description
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full border rounded px-2 py-1 text-sm"
+                      placeholder="e.g., Product details"
+                      value={row.description}
+                      onChange={(e) =>
+                        handleInputChange(row.id, 'description', e.target.value)
+                      }
+                    />
                   </div>
                 </div>
               ))}
               <div className="flex flex-col space-y-2">
-                <button type="button" className="px-4 py-2 bg-cyan-800 text-white rounded text-sm" onClick={handleAddRow}>Add Another Item</button>
-                <button type="button" className="px-4 py-2 bg-cyan-800 text-white rounded text-sm" onClick={() => { setShowAddProductPopup(false); setShowAddCategoryPopup(true); }}>Add Category</button>
+                <button
+                  type="button"
+                  className="px-4 py-2 bg-cyan-800 text-white rounded text-sm"
+                  onClick={handleAddRow}
+                >
+                  Add Another Item
+                </button>
+                <button
+                  type="button"
+                  className="px-4 py-2 bg-cyan-800 text-white rounded text-sm"
+                  onClick={() => {
+                    setShowAddProductPopup(false);
+                    setShowAddCategoryPopup(true);
+                  }}
+                >
+                  Add Category
+                </button>
                 <div className="flex space-x-2">
-                  <button type="button" className="flex-1 px-4 py-2 bg-red-800 text-white rounded text-sm" onClick={() => setShowAddProductPopup(false)}>Close</button>
-                  <button type="submit" className="flex-1 px-4 py-2 bg-cyan-700 text-white rounded text-sm">Save All</button>
+                  <button
+                    type="button"
+                    className="flex-1 px-4 py-2 bg-red-800 text-white rounded text-sm"
+                    onClick={() => setShowAddProductPopup(false)}
+                  >
+                    Close
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 px-4 py-2 bg-cyan-700 text-white rounded text-sm"
+                  >
+                    Save All
+                  </button>
                 </div>
               </div>
             </form>
@@ -991,12 +1263,16 @@ const Products = () => {
       );
     }
 
+    /* ── DESKTOP ── */
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
         <div className="bg-white p-4 sm:p-6 rounded shadow-lg w-full max-w-[95vw] sm:max-w-3xl md:max-w-4xl">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg sm:text-xl font-bold">Add New Product</h2>
-            <button onClick={() => setShowAddProductPopup(false)} className="text-cyan-700">
+            <button
+              onClick={() => setShowAddProductPopup(false)}
+              className="text-cyan-700"
+            >
               Close
             </button>
           </div>
@@ -1005,67 +1281,150 @@ const Products = () => {
               <table className="min-w-full bg-white border">
                 <thead>
                   <tr>
-                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base w-[60px] sm:w-[80px]">S.No</th>
-                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base min-w-[150px]">Product Name</th>
-                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base min-w-[120px]">Category</th>
-                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base min-w-[100px]">HSCODE</th>
-                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base min-w-[100px] sm:min-w-[120px]">P. Unit</th>
-                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base min-w-[100px] sm:min-w-[120px]">S. Unit</th>
-                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base min-w-[100px] sm:min-w-[120px]">CF</th>
-                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base min-w-[150px]">Description</th>
-                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base w-[80px] sm:w-[100px]">Action</th>
+                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base w-[60px] sm:w-[80px]">
+                      S.No
+                    </th>
+                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base min-w-[150px]">
+                      Product Name
+                    </th>
+                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base min-w-[120px]">
+                      Category
+                    </th>
+                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base min-w-[100px]">
+                      HSCODE
+                    </th>
+                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base min-w-[100px] sm:min-w-[120px]">
+                      P. Unit
+                    </th>
+                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base min-w-[100px] sm:min-w-[120px]">
+                      S. Unit
+                    </th>
+                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base min-w-[100px] sm:min-w-[120px]">
+                      CF
+                    </th>
+                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base min-w-[150px]">
+                      Description
+                    </th>
+                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base w-[80px] sm:w-[100px]">
+                      Action
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {productRows.map((row, index) => (
+                  {productRows.map((row, i) => (
                     <tr key={row.id}>
-                      <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">{row.id}</td>
-                      <td className="py-2 px-3 sm:px-4 border relative">
+                      <td className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
+                        {row.id}
+                      </td>
+                      <td className="py-2 px-3 sm:px-4 border">
                         <input
                           type="text"
                           className="w-full border rounded px-2 py-1 h-10 sm:h-12 text-sm sm:text-base"
                           placeholder="e.g., Laptop"
                           value={row.name}
-                          onChange={e => handleInputChange(row.id, 'name', e.target.value)}
+                          onChange={(e) =>
+                            handleInputChange(row.id, 'name', e.target.value)
+                          }
                           required
-                          ref={el => (inputRefs.current[index] = el)}
                         />
                       </td>
                       <td className="py-2 px-3 sm:px-4 border">
-                        <select className="w-full border rounded px-2 py-1 h-10 sm:h-12 text-sm sm:text-base" value={row.category_id} onChange={e => handleInputChange(row.id, 'category_id', e.target.value)} required>
-                          <option value="" disabled>Select Category</option>
-                          {categories.map(category => (
-                            <option key={category.id} value={category.id}>{category.name}</option>
+                        <select
+                          className="w-full border rounded px-2 py-1 h-10 sm:h-12 text-sm sm:text-base"
+                          value={row.category_id}
+                          onChange={(e) =>
+                            handleInputChange(row.id, 'category_id', e.target.value)
+                          }
+                          required
+                        >
+                          <option value="" disabled>
+                            Select Category
+                          </option>
+                          {categories.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
                           ))}
                         </select>
                       </td>
                       <td className="py-2 px-3 sm:px-4 border">
-                        <input type="text" className="w-full border rounded px-2 py-1 h-10 sm:h-12 text-sm sm:text-base" placeholder="e.g., LAP123" value={row.hscode} onChange={e => handleInputChange(row.id, 'hscode', e.target.value)} />
+                        <input
+                          type="text"
+                          className="w-full border rounded px-2 py-1 h-10 sm:h-12 text-sm sm:text-base"
+                          placeholder="e.g., LAP123"
+                          value={row.hscode}
+                          onChange={(e) =>
+                            handleInputChange(row.id, 'hscode', e.target.value)
+                          }
+                        />
                       </td>
                       <td className="py-2 px-3 sm:px-4 border">
-                        <select className="w-full border rounded px-2 py-1 h-10 sm:h-12 text-sm sm:text-base" value={row.p_unit} onChange={e => handleInputChange(row.id, 'p_unit', e.target.value)}>
-                          <option value="" disabled>Select Primary Unit</option>
-                          {units.map(unit => (
-                            <option key={unit.id} value={unit.id}>{unit.name}</option>
+                        <select
+                          className="w-full border rounded px-2 py-1 h-10 sm:h-12 text-sm sm:text-base"
+                          value={row.p_unit}
+                          onChange={(e) =>
+                            handleInputChange(row.id, 'p_unit', e.target.value)
+                          }
+                        >
+                          <option value="" disabled>
+                            Select Primary Unit
+                          </option>
+                          {units.map((u) => (
+                            <option key={u.id} value={u.id}>
+                              {u.name}
+                            </option>
                           ))}
                         </select>
                       </td>
                       <td className="py-2 px-3 sm:px-4 border">
-                        <select className="w-full border rounded px-2 py-1 h-10 sm:h-12 text-sm sm:text-base" value={row.s_unit} onChange={e => handleInputChange(row.id, 's_unit', e.target.value)}>
-                          <option value="" disabled>Select Secondary Unit</option>
-                          {units.map(unit => (
-                            <option key={unit.id} value={unit.id}>{unit.name}</option>
+                        <select
+                          className="w-full border rounded px-2 py-1 h-10 sm:h-12 text-sm sm:text-base"
+                          value={row.s_unit}
+                          onChange={(e) =>
+                            handleInputChange(row.id, 's_unit', e.target.value)
+                          }
+                        >
+                          <option value="" disabled>
+                            Select Secondary Unit
+                          </option>
+                          {units.map((u) => (
+                            <option key={u.id} value={u.id}>
+                              {u.name}
+                            </option>
                           ))}
                         </select>
                       </td>
                       <td className="py-2 px-3 sm:px-4 border">
-                        <input type="number" step="any" className="w-full border rounded px-2 py-1 h-10 sm:h-12 text-sm sm:text-base" placeholder="e.g., 25.5" value={row.c_factor} onChange={e => handleInputChange(row.id, 'c_factor', e.target.value)} />
+                        <input
+                          type="number"
+                          step="any"
+                          className="w-full border rounded px-2 py-1 h-10 sm:h-12 text-sm sm:text-base"
+                          placeholder="e.g., 25.5"
+                          value={row.c_factor}
+                          onChange={(e) =>
+                            handleInputChange(row.id, 'c_factor', e.target.value)
+                          }
+                        />
                       </td>
                       <td className="py-2 px-3 sm:px-4 border">
-                        <input type="text" className="w-full border rounded px-2 py-1 h-10 sm:h-12 text-sm sm:text-base" placeholder="e.g., Product details" value={row.description} onChange={e => handleInputChange(row.id, 'description', e.target.value)} />
+                        <input
+                          type="text"
+                          className="w-full border rounded px-2 py-1 h-10 sm:h-12 text-sm sm:text-base"
+                          placeholder="e.g., Product details"
+                          value={row.description}
+                          onChange={(e) =>
+                            handleInputChange(row.id, 'description', e.target.value)
+                          }
+                        />
                       </td>
                       <td className="py-2 px-3 sm:px-4 border">
-                        <button type="button" className="px-2 py-1 bg-red-500 text-white rounded text-sm sm:text-base" onClick={() => handleRemoveRow(row.id)}>Remove</button>
+                        <button
+                          type="button"
+                          className="px-2 py-1 bg-red-500 text-white rounded text-sm sm:text-base"
+                          onClick={() => handleRemoveRow(row.id)}
+                        >
+                          Remove
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -1074,12 +1433,38 @@ const Products = () => {
             </div>
             <div className="flex flex-col sm:flex-row justify-between mt-4 gap-2">
               <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-                <button type="button" className="px-4 py-2 bg-cyan-800 text-white rounded text-sm sm:text-base" onClick={handleAddRow}>Add New Item</button>
-                <button type="button" className="px-4 py-2 bg-cyan-800 text-white rounded text-sm sm:text-base" onClick={() => { setShowAddProductPopup(false); setShowAddCategoryPopup(true); }}>Add Category</button>
+                <button
+                  type="button"
+                  className="px-4 py-2 bg-cyan-800 text-white rounded text-sm sm:text-base"
+                  onClick={handleAddRow}
+                >
+                  Add New Item
+                </button>
+                <button
+                  type="button"
+                  className="px-4 py-2 bg-cyan-800 text-white rounded text-sm sm:text-base"
+                  onClick={() => {
+                    setShowAddProductPopup(false);
+                    setShowAddCategoryPopup(true);
+                  }}
+                >
+                  Add Category
+                </button>
               </div>
               <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-                <button type="button" className="px-4 py-2 bg-red-800 text-white rounded text-sm sm:text-base" onClick={() => setShowAddProductPopup(false)}>Close</button>
-                <button type="submit" className="px-4 py-2 bg-cyan-800 text-white rounded text-sm sm:text-base">Save Products</button>
+                <button
+                  type="button"
+                  className="px-4 py-2 bg-red-800 text-white rounded text-sm sm:text-base"
+                  onClick={() => setShowAddProductPopup(false)}
+                >
+                  Close
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-cyan-800 text-white rounded text-sm sm:text-base"
+                >
+                  Save Products
+                </button>
               </div>
             </div>
           </form>
@@ -1088,7 +1473,7 @@ const Products = () => {
     );
   };
 
-  // Add Category Popup
+  /* ────────────────────── ADD CATEGORY POPUP ────────────────────── */
   const AddCategoryPopup = () => {
     const [categoryName, setCategoryName] = useState('');
 
@@ -1100,15 +1485,18 @@ const Products = () => {
         return;
       }
       if (!categoryName) {
-        showToast('Please enter a category name to add.', true);
+        showToast('Please enter a category name.', true);
         return;
       }
-      if (categories.some(cat => cat.name.toLowerCase() === categoryName.toLowerCase())) {
-        showToast(`Category "${categoryName}" is already in the list.`, true);
+      if (
+        categories.some((c) => c.name.toLowerCase() === categoryName.toLowerCase())
+      ) {
+        showToast(`Category "${categoryName}" already exists.`, true);
         return;
       }
+
       try {
-        const response = await fetch(`${API_BASE_URL}/categories`, {
+        const res = await fetch(`${API_BASE_URL}/categories`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1116,14 +1504,18 @@ const Products = () => {
           },
           body: JSON.stringify({ name: categoryName }),
         });
-        if (!response.ok) throw new Error('Unable to add category.');
-        const data = await response.json();
-        showToast(`Category "${categoryName}" added successfully!`, false);
-        setCategories([...categories, data]);
+        if (!res.ok) throw new Error('Unable to add category.');
+        const data = await res.json();
+        showToast(`Category "${categoryName}" added!`, false);
+        setCategories((prev) =>
+          [...prev, data].sort((a, b) =>
+            a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+          )
+        );
         setShowAddCategoryPopup(false);
-        window.location.reload();
-      } catch (error) {
-        showToast('Couldn’t add the category. Please try again.', true);
+      } catch (e) {
+        console.error('Category add error:', e);
+        showToast('Could not add the category.', true);
       }
     };
 
@@ -1132,7 +1524,10 @@ const Products = () => {
         <div className="bg-white p-4 sm:p-6 rounded shadow-lg w-full max-w-[95vw] sm:max-w-md">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg sm:text-xl font-bold">Add New Category</h2>
-            <button onClick={() => setShowAddCategoryPopup(false)} className="text-cyan-700">
+            <button
+              onClick={() => setShowAddCategoryPopup(false)}
+              className="text-cyan-700"
+            >
               Close
             </button>
           </div>
@@ -1142,17 +1537,22 @@ const Products = () => {
               className="w-full border rounded px-2 py-1 h-10 sm:h-12 text-sm sm:text-base mb-4"
               placeholder="Enter category name"
               value={categoryName}
-              onChange={e => setCategoryName(e.target.value)}
+              onChange={(e) => setCategoryName(e.target.value)}
               required
             />
-            <button type="submit" className="px-4 py-2 bg-cyan-800 text-white rounded text-sm sm:text-base">Save Category</button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-cyan-800 text-white rounded text-sm sm:text-base"
+            >
+              Save Category
+            </button>
           </form>
         </div>
       </div>
     );
   };
 
-  // Add Unit Popup
+  /* ────────────────────── ADD UNIT POPUP ────────────────────── */
   const AddUnitPopup = () => {
     const [unitName, setUnitName] = useState('');
 
@@ -1164,15 +1564,16 @@ const Products = () => {
         return;
       }
       if (!unitName) {
-        showToast('Please enter a unit name to add.', true);
+        showToast('Please enter a unit name.', true);
         return;
       }
-      if (units.some(unit => unit.name.toLowerCase() === unitName.toLowerCase())) {
-        showToast(`Unit "${unitName}" is already in the list.`, true);
+      if (units.some((u) => u.name.toLowerCase() === unitName.toLowerCase())) {
+        showToast(`Unit "${unitName}" already exists.`, true);
         return;
       }
+
       try {
-        const response = await fetch(`${API_BASE_URL}/add-unit`, {
+        const res = await fetch(`${API_BASE_URL}/add-unit`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1180,14 +1581,18 @@ const Products = () => {
           },
           body: JSON.stringify({ name: unitName }),
         });
-        if (!response.ok) throw new Error('Unable to add unit.');
-        const data = await response.json();
-        showToast(`Unit "${unitName}" added successfully!`, false);
-        setUnits([...units, data].sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase())));
+        if (!res.ok) throw new Error('Unable to add unit.');
+        const data = await res.json();
+        showToast(`Unit "${unitName}" added!`, false);
+        setUnits((prev) =>
+          [...prev, data].sort((a, b) =>
+            a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+          )
+        );
         setShowAddUnitPopup(false);
-        window.location.reload();
-      } catch (error) {
-        showToast('Couldn’t add the unit. Please try again.', true);
+      } catch (e) {
+        console.error('Unit add error:', e);
+        showToast('Could not add the unit.', true);
       }
     };
 
@@ -1196,7 +1601,10 @@ const Products = () => {
         <div className="bg-white p-4 sm:p-6 rounded shadow-lg w-full max-w-[95vw] sm:max-w-md">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg sm:text-xl font-bold">Add New Unit</h2>
-            <button onClick={() => setShowAddUnitPopup(false)} className="text-cyan-700">
+            <button
+              onClick={() => setShowAddUnitPopup(false)}
+              className="text-cyan-700"
+            >
               Close
             </button>
           </div>
@@ -1206,148 +1614,191 @@ const Products = () => {
               className="w-full border rounded px-2 py-1 h-10 sm:h-12 text-sm sm:text-base mb-4"
               placeholder="Enter unit name"
               value={unitName}
-              onChange={e => setUnitName(e.target.value)}
+              onChange={(e) => setUnitName(e.target.value)}
               required
             />
-            <button type="submit" className="px-4 py-2 bg-cyan-800 text-white rounded text-sm sm:text-base">Save Unit</button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-cyan-800 text-white rounded text-sm sm:text-base"
+            >
+              Save Unit
+            </button>
           </form>
         </div>
       </div>
     );
   };
 
-  // Initial Fetch
+  /* ────────────────────── INITIAL FETCH ────────────────────── */
   useEffect(() => {
-    if (!user || !user.id || !authToken) {
-      showToast('Session expired or invalid. Please log in again.', true);
+    if (!user?.id || !authToken) {
+      showToast('Session expired. Please log in again.', true);
       navigate('/login');
       return;
     }
     if (isDataFetched) return;
 
     Promise.all([fetchCategories(), fetchUnits(), fetchAllProducts()])
-      .then(([fetchedCategories, fetchedUnits]) => {
-        setCategories(fetchedCategories);
-        setUnits(fetchedUnits);
+      .then(([cats, unis]) => {
+        setCategories(cats);
+        setUnits(unis);
         setIsDataFetched(true);
-        if (fetchedCategories.length === 0) {
-          showToast('No categories available yet. Add one to get started!', false);
-        }
-        if (fetchedUnits.length === 0) {
-          showToast('No units available. Please add units in the Units section.', true);
-        }
         fetchUserData();
+        if (cats.length === 0)
+          showToast('Add a category to get started!', false);
+        if (unis.length === 0)
+          showToast('No units – add some in the Units tab.', true);
       })
-      .catch(error => {
-        showToast('Failed to load initial data. Please try again.', true);
+      .catch((e) => {
+        console.error('Initial data fetch error:', e);
+        showToast('Failed to load initial data.', true);
       });
-  }, [user, authToken, navigate, isDataFetched]);
+  }, [
+    user?.id,
+    authToken,
+    navigate,
+    isDataFetched,
+    fetchCategories,
+    fetchUnits,
+    fetchAllProducts,
+    fetchUserData,
+    showToast,
+  ]);
 
+  /* ────────────────────── RENDER ────────────────────── */
   return (
-    <main className="flex-1 p-2 sm:p-6">
-      {/* Products Section */}
-      <div className={`${showUnitSection ? 'hidden' : 'block'} bg-white rounded-lg shadow-lg overflow-hidden`}>
-        <CustomHeader
-          title="Products"
-          userName={userName}
-          onProfileClick={() => navigate('/profile')}
-          isUnitSection={false}
-        />
-        <div className="p-4 sm:p-6">
-          {/* Controls */}
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 space-y-4 lg:space-y-0">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 w-full lg:w-auto">
-              <div className="relative w-full sm:w-64">
-                <i className="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                <input
-                  type="text"
-                  className="w-full pl-10 pr-3 py-2 border rounded-lg text-sm sm:text-base"
-                  placeholder="Search products..."
-                  value={searchTerm}
-                  onChange={e => { setSearchTerm(e.target.value); setAllProductsCurrentPage(1); }}
-                />
-              </div>
-              <select
-                className="w-full sm:w-48 border rounded-lg px-3 py-2 text-sm sm:text-base"
-                value={categoryFilter}
-                onChange={e => { setCategoryFilter(e.target.value); setAllProductsCurrentPage(1); }}
+    <div className='p-6'>
+      <Header
+        title={showUnitSection ? 'Units Information' : 'Products'}
+        bgColor="bg-gradient-to-r from-neutral-800 to-cyan-700 text-white"
+        userName={userName}
+        onProfileClick={() => navigate('/profile')}
+      />
+      <main className="flex-1 p-2 sm:p-6">
+        {/* ── PRODUCTS SECTION ── */}
+        <div
+          className={`${
+            showUnitSection ? 'hidden' : 'block'
+          } bg-white rounded-lg shadow-lg overflow-hidden`}
+        >
+          <div className="p-4 sm:p-6">
+            {/* Controls */}
+    {/* Controls */}
+    <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 space-y-4 lg:space-y-0">
+      {/* Left: Title */}
+      <h3 className="text-base sm:text-lg md:text-xl lg:text-2xl font-semibold text-left">
+        All Products List
+      </h3>
+
+      {/* Right: Controls */}
+      <div className="flex flex-col lg:flex-row items-start lg:items-center space-y-4 lg:space-y-0 lg:space-x-6 w-full lg:w-auto">
+        {/* Search and Category Filter */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 w-full lg:w-auto">
+          <div className="relative w-full sm:w-64">
+            <i className="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+            <input
+              type="text"
+              className="w-full pl-10 pr-3 py-2 border rounded-lg text-sm sm:text-base"
+              placeholder="Search products..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setAllProductsCurrentPage(1);
+              }}
+            />
+          </div>
+          <select
+            className="w-full sm:w-48 border rounded-lg px-3 py-2 text-sm sm:text-base"
+            value={categoryFilter}
+            onChange={(e) => {
+              setCategoryFilter(e.target.value);
+              setAllProductsCurrentPage(1);
+            }}
+          >
+            <option value="">All Categories</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Buttons */}
+        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 w-full lg:w-auto">
+          {user?.rid <= 7 && (
+            <>
+              <button
+                className="px-4 py-2 bg-cyan-800 text-white rounded-lg text-sm sm:text-base flex items-center "
+                onClick={() => setShowAddProductPopup(true)}
               >
-                <option value="">All Categories</option>
-                {categories.map(category => (
-                  <option key={category.id} value={category.id}>{category.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 w-full lg:w-auto">
-              {user && user.rid <= 7 && (
-                <>
-                  <button className="px-4 py-2 bg-cyan-800 text-white rounded-lg text-sm sm:text-base" onClick={() => setShowAddProductPopup(true)}>
-                    Add Product
-                  </button>
-                  <button className="px-4 py-2 bg-cyan-800 text-white rounded-lg text-sm sm:text-base" onClick={() => setShowUnitSection(true)}>
-                    Units
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Products Table/List */}
-          <div className="bg-gray-50 p-4 rounded-lg">
-            {displayProducts()}
-          </div>
+               <FaPlus/>  Add Product
+              </button>
+              <button
+                className="px-4 py-2 bg-cyan-800 text-white rounded-lg text-sm sm:text-base flex items-center"
+                onClick={() => setShowUnitSection(true)}
+              >
+               <TbRulerMeasure /> Units
+              </button>
+            </>
+          )}
         </div>
       </div>
-
-      {/* Units Section */}
-      <div className={`${showUnitSection ? 'block' : 'hidden'} bg-white rounded-lg shadow-lg overflow-hidden`}>
-        <CustomHeader
-          title="Units Information"
-          userName={userName}
-          onProfileClick={() => navigate('/profile')}
-          isUnitSection={true}
-        />
-        <div className="p-4 sm:p-6">
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 space-y-4 lg:space-y-0">
-            <button
-              className="px-4 py-2 bg-cyan-800 text-white rounded-lg text-sm sm:text-base"
-              onClick={() => { setShowUnitSection(false); fetchAllProducts(); }}
-            >
-              Back to Products
-            </button>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 w-full lg:w-auto">
-              <div className="relative w-full sm:w-64">
-                <i className="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                <input
-                  type="text"
-                  className="w-full pl-10 pr-3 py-2 border rounded-lg text-sm sm:text-base"
-                  placeholder="Search units..."
-                  value={unitSearchTerm}
-                  onChange={e => { setUnitSearchTerm(e.target.value); setUnitsCurrentPage(1); }}
-                />
+    </div>
+            {/* Table / List */}
+            <div className=" p-4 rounded-lg">{displayProducts()}</div>
+          </div>
+        </div>
+        {/* ── UNITS SECTION ── */}
+        <div
+          className={`${
+            showUnitSection ? 'block' : 'hidden'
+          } bg-white rounded-lg shadow-lg overflow-hidden`}
+        >
+          <div className="p-4 sm:p-6">
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 space-y-4 lg:space-y-0">
+              <button
+                className="px-4 py-2 bg-cyan-800 text-white rounded-lg text-sm sm:text-base"
+                onClick={() => {
+                  setShowUnitSection(false);
+                  fetchAllProducts();
+                }}
+              >
+                Back to Products
+              </button>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 w-full lg:w-auto">
+                <div className="relative w-full sm:w-64">
+                  <i className="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                  <input
+                    type="text"
+                    className="w-full pl-10 pr-3 py-2 border rounded-lg text-sm sm:text-base"
+                    placeholder="Search units..."
+                    value={unitSearchTerm}
+                    onChange={(e) => {
+                      setUnitSearchTerm(e.target.value);
+                      setUnitsCurrentPage(1);
+                    }}
+                  />
+                </div>
+                {user?.rid <= 7 && (
+                  <button
+                    className="px-4 py-2 bg-cyan-800 text-white rounded-lg text-sm sm:text-base"
+                    onClick={() => setShowAddUnitPopup(true)}
+                  >
+                    Add Unit
+                  </button>
+                )}
               </div>
-              {user && user.rid <= 7 && (
-                <button
-                  className="px-4 py-2 bg-cyan-800 text-white rounded-lg text-sm sm:text-base"
-                  onClick={() => setShowAddUnitPopup(true)}
-                >
-                  Add Unit
-                </button>
-              )}
             </div>
-          </div>
-          <div className="bg-gray-50 p-4 rounded-lg">
-            {displayUnits()}
+            <div className="bg-gray-50 p-4 rounded-lg">{displayUnits()}</div>
           </div>
         </div>
-      </div>
-
-      {/* Popups */}
-      {showAddProductPopup && <AddProductPopup />}
-      {showAddCategoryPopup && <AddCategoryPopup />}
-      {showAddUnitPopup && <AddUnitPopup />}
-    </main>
+        {/* ── POPUPS ── */}
+        {showAddProductPopup && <AddProductPopup />}
+        {showAddCategoryPopup && <AddCategoryPopup />}
+        {showAddUnitPopup && <AddUnitPopup />}
+      </main>
+    </div>
   );
 };
 
