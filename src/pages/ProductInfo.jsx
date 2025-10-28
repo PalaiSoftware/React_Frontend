@@ -3,42 +3,27 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Search,
-  Plus,
   Edit,
   Trash2,
   X,
   ChevronLeft,
   ChevronRight,
-  User,
   Save,
   AlertCircle,
 } from 'lucide-react';
+import Header from '../components/Header';
 
 const API_BASE_URL = 'http://127.0.0.1:8000/api'; // Change if needed
 
 export default function ProductInfo() {
   const [user, setUser] = useState(null);
-  const [userName, setUserName] = useState('User');
   const [authToken, setAuthToken] = useState(null);
   const [productInfoList, setProductInfoList] = useState([]);
   const [stockData, setStockData] = useState([]);
   const [unitData, setUnitData] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
-  const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [addFormItems, setAddFormItems] = useState([
-    {
-      id: Date.now(),
-      name: '',
-      hsn_code: '',
-      purchase_price: '',
-      profit_percentage: '',
-      gst: '',
-      unit_name: '',
-      description: '',
-    },
-  ]);
   const [toasts, setToasts] = useState([]);
   const [loading, setLoading] = useState(true);
   const itemsPerPage = 50;
@@ -53,36 +38,19 @@ export default function ProductInfo() {
     }, 3000);
   }, []);
 
-  // Load from localStorage + set userName
+  // Load from localStorage
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     const storedToken = localStorage.getItem('authToken');
     if (storedUser && storedToken) {
       const parsed = JSON.parse(storedUser);
       setUser(parsed);
-      setUserName(parsed.name || 'User');
       setAuthToken(storedToken);
     } else {
       showToast('Please log in.', true);
       setLoading(false);
     }
   }, [showToast]);
-
-  // Optional: fetch fresh name from backend
-  const fetchUserData = async () => {
-    if (!user?.id || !authToken) return;
-    try {
-      const res = await fetch(`${API_BASE_URL}/user/${user.id}`, {
-        headers: { Authorization: `Bearer ${authToken}` },
-      });
-      if (!res.ok) throw new Error('Failed to fetch user');
-      const data = await res.json();
-      const name = data.data?.name || 'User';
-      setUserName(name);
-    } catch (err) {
-      showToast(err.message, true);
-    }
-  };
 
   // Fetch Units
   const fetchUnits = async () => {
@@ -171,7 +139,6 @@ export default function ProductInfo() {
 
   useEffect(() => {
     if (user && authToken) {
-      fetchUserData();
       fetchProductInfo();
     }
   }, [user, authToken]);
@@ -244,63 +211,6 @@ export default function ProductInfo() {
     }
   };
 
-  // Add Multiple
-  const addProducts = async () => {
-    const products = addFormItems.map((item) => {
-      if (!item.name.trim()) throw new Error('Product name required');
-      if (
-        productInfoList.some(
-          (p) => p.name.toLowerCase() === item.name.toLowerCase()
-        )
-      ) {
-        throw new Error(`Product "${item.name}" already exists`);
-      }
-      const pp = parseFloat(item.purchase_price) || 0;
-      const profit = parseFloat(item.profit_percentage) || 0;
-      const gst = parseFloat(item.gst) || 0;
-      return {
-        name: item.name,
-        hsn_code: item.hsn_code || 'N/A',
-        purchase_price: pp.toFixed(2),
-        profit_percentage: profit.toFixed(2),
-        gst: gst.toFixed(2),
-        unit_name: item.unit_name || 'N/A',
-        description: item.description || 'N/A',
-        pre_gst_sale_cost: (pp * (1 + profit / 100)).toFixed(2),
-        post_gst_sale_cost: (pp * (1 + profit / 100) * (1 + gst / 100)).toFixed(2),
-      };
-    });
-
-    try {
-      const res = await fetch(`${API_BASE_URL}/product-info`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`,
-        },
-        body: JSON.stringify({ products }),
-      });
-      if (!res.ok) throw new Error('Save failed');
-      await fetchProductInfo();
-      setShowAddForm(false);
-      setAddFormItems([
-        {
-          id: Date.now(),
-          name: '',
-          hsn_code: '',
-          purchase_price: '',
-          profit_percentage: '',
-          gst: '',
-          unit_name: '',
-          description: '',
-        },
-      ]);
-      showToast('Products added!', false);
-    } catch (err) {
-      showToast(err.message, true);
-    }
-  };
-
   if (loading)
     return (
       <div className="flex items-center justify-center h-screen text-lg bg-gray-50">
@@ -312,39 +222,12 @@ export default function ProductInfo() {
     <>
       <div className="min-h-screen bg-gray-50">
         {/* Header */}
-        <header className="bg-white shadow-sm border-b">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-gray-900">
-              Products Information
-            </h1>
+        <Header title="Products Information" bgColor="bg-gradient-to-r from-neutral-800 to-cyan-700 text-white" />
 
-            <div className="flex items-center gap-3">
-              {/* USER NAME - CLICK TO GO TO PROFILE */}
-              <button
-                onClick={() => {
-                  window.location.href = '/profile'; // Change to your profile route
-                }}
-                className="flex items-center gap-2 hover:text-cyan-700 transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-700 rounded px-1 py-1"
-              >
-                <User className="w-5 h-5 text-gray-600" />
-                <span className="font-medium">{userName}</span>
-              </button>
-
-              {!isRestricted && (
-                <button
-                  onClick={() => setShowAddForm(true)}
-                  className="bg-cyan-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition"
-                >
-                  <Plus className="w-4 h-4" /> Add Product
-                </button>
-              )}
-            </div>
-          </div>
-        </header>
-
-        {/* Search */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="relative max-w-md">
+        {/* Main Content */}
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          {/* Search Bar */}
+          <div className="relative max-w-md mb-6">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
@@ -357,11 +240,9 @@ export default function ProductInfo() {
               className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-700"
             />
           </div>
-        </div>
 
-        {/* Table View - Large Screens */}
-        <div className="hidden lg:block max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-10">
-          <div className="bg-white rounded-lg shadow overflow-hidden">
+          {/* Table View - Large Screens */}
+          <div className="hidden lg:block bg-white rounded-lg shadow overflow-hidden">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -490,8 +371,8 @@ export default function ProductInfo() {
             </table>
           </div>
 
-          {/* Pagination */}
-          <div className="flex justify-between items-center mt-6">
+          {/* Pagination - Desktop */}
+          <div className="hidden lg:flex justify-between items-center mt-6">
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
@@ -500,8 +381,7 @@ export default function ProductInfo() {
               <ChevronLeft className="w-4 h-4" /> Prev
             </button>
             <span className="text-sm text-gray-600">
-              Page {currentPage} of {totalPages} ({filteredProducts.length}{' '}
-              total)
+              Page {currentPage} of {totalPages} ({filteredProducts.length} total)
             </span>
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
@@ -511,17 +391,15 @@ export default function ProductInfo() {
               Next <ChevronRight className="w-4 h-4" />
             </button>
           </div>
-        </div>
 
-        {/* Card View - Mobile */}
-        <div className="lg:hidden max-w-7xl mx-auto px-4 pb-10">
-          {paginated.length === 0 ? (
-            <div className="text-center py-10 text-gray-500">
-              No products found
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {paginated.map((p, i) => {
+          {/* Card View - Mobile */}
+          <div className="lg:hidden space-y-4">
+            {paginated.length === 0 ? (
+              <div className="text-center py-10 text-gray-500">
+                No products found
+              </div>
+            ) : (
+              paginated.map((p, i) => {
                 const idx = (currentPage - 1) * itemsPerPage + i + 1;
                 const isEditing = editingId === p.id;
                 return (
@@ -560,24 +438,20 @@ export default function ProductInfo() {
                       {!isRestricted && (
                         <>
                           <div>
-                            <strong>Purchase:</strong> ₹
-                            {p.purchase_price.toFixed(2)}
+                            <strong>Purchase:</strong> ₹{p.purchase_price.toFixed(2)}
                           </div>
                           <div>
-                            <strong>Profit:</strong>{' '}
-                            {p.profit_percentage.toFixed(2)}%
+                            <strong>Profit:</strong> {p.profit_percentage.toFixed(2)}%
                           </div>
                         </>
                       )}
                       <div className="col-span-2">
                         <strong>Costs:</strong>
                         <br />
-                        Pre: ₹{p.pre_gst_sale_cost.toFixed(2)} | GST:{' '}
-                        {p.gst}% | Post: ₹{p.post_gst_sale_cost.toFixed(2)}
+                        Pre: ₹{p.pre_gst_sale_cost.toFixed(2)} | GST: {p.gst}% | Post: ₹{p.post_gst_sale_cost.toFixed(2)}
                       </div>
                       <div className="col-span-2">
-                        <strong>Stocks:</strong> P:{p.purchase_stock} S:
-                        {p.sales_stock} C:{p.current_stock}
+                        <strong>Stocks:</strong> P:{p.purchase_stock} S:{p.sales_stock} C:{p.current_stock}
                       </div>
                       <div className="col-span-2 text-xs text-gray-500 mt-2">
                         {p.description}
@@ -595,11 +469,12 @@ export default function ProductInfo() {
                     )}
                   </div>
                 );
-              })}
-            </div>
-          )}
+              })
+            )}
+          </div>
+
           {/* Mobile Pagination */}
-          <div className="flex justify-center gap-4 mt-6">
+          <div className="lg:hidden flex justify-center gap-4 mt-6">
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
@@ -618,160 +493,7 @@ export default function ProductInfo() {
               Next
             </button>
           </div>
-        </div>
-
-        {/* Add Form Modal */}
-        {showAddForm && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg max-w-4xl w-full max-h-screen overflow-y-auto p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold">Add New Products</h2>
-                <button
-                  onClick={() => setShowAddForm(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-              <div className="space-y-4">
-                {addFormItems.map((item, i) => (
-                  <div
-                    key={item.id}
-                    className="border p-4 rounded-lg relative"
-                  >
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                      <input
-                        placeholder="Product Name*"
-                        className="border rounded px-3 py-2"
-                        value={item.name}
-                        onChange={(e) => {
-                          const newItems = [...addFormItems];
-                          newItems[i].name = e.target.value;
-                          setAddFormItems(newItems);
-                        }}
-                      />
-                      <input
-                        placeholder="HSN Code"
-                        className="border rounded px-3 py-2"
-                        value={item.hsn_code}
-                        onChange={(e) => {
-                          const newItems = [...addFormItems];
-                          newItems[i].hsn_code = e.target.value;
-                          setAddFormItems(newItems);
-                        }}
-                      />
-                      <input
-                        type="number"
-                        step="0.01"
-                        placeholder="Purchase Price"
-                        className="border rounded px-3 py-2"
-                        value={item.purchase_price}
-                        onChange={(e) => {
-                          const newItems = [...addFormItems];
-                          newItems[i].purchase_price = e.target.value;
-                          setAddFormItems(newItems);
-                        }}
-                      />
-                      <input
-                        type="number"
-                        step="0.01"
-                        placeholder="Profit %"
-                        className="border rounded px-3 py-2"
-                        value={item.profit_percentage}
-                        onChange={(e) => {
-                          const newItems = [...addFormItems];
-                          newItems[i].profit_percentage = e.target.value;
-                          setAddFormItems(newItems);
-                        }}
-                      />
-                      <input
-                        type="number"
-                        step="0.01"
-                        placeholder="GST %"
-                        className="border rounded px-3 py-2"
-                        value={item.gst}
-                        onChange={(e) => {
-                          const newItems = [...addFormItems];
-                          newItems[i].gst = e.target.value;
-                          setAddFormItems(newItems);
-                        }}
-                      />
-                      <input
-                        placeholder="Unit Name"
-                        className="border rounded px-3 py-2"
-                        value={item.unit_name}
-                        onChange={(e) => {
-                          const newItems = [...addFormItems];
-                          newItems[i].unit_name = e.target.value;
-                          setAddFormItems(newItems);
-                        }}
-                      />
-                      <textarea
-                        placeholder="Description"
-                        className="border rounded px-3 py-2 md:col-span-2 lg:col-span-4"
-                        rows="2"
-                        value={item.description}
-                        onChange={(e) => {
-                          const newItems = [...addFormItems];
-                          newItems[i].description = e.target.value;
-                          setAddFormItems(newItems);
-                        }}
-                      />
-                    </div>
-                    {addFormItems.length > 1 && (
-                      <button
-                        onClick={() =>
-                          setAddFormItems((prev) =>
-                            prev.filter((_, idx) => idx !== i)
-                          )
-                        }
-                        className="absolute top-2 right-2 text-red-500 hover:text-red-700"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-              <div className="flex justify-between mt-6">
-                <button
-                  onClick={() =>
-                    setAddFormItems((prev) => [
-                      ...prev,
-                      {
-                        id: Date.now(),
-                        name: '',
-                        hsn_code: '',
-                        purchase_price: '',
-                        profit_percentage: '',
-                        gst: '',
-                        unit_name: '',
-                        description: '',
-                      },
-                    ])
-                  }
-                  className="px-4 py-2 border rounded-lg flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" /> Add Item
-                </button>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setShowAddForm(false)}
-                    className="px-4 py-2 border rounded-lg"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={addProducts}
-                    className="px-4 py-2 bg-cyan-700 text-white rounded-lg flex items-center gap-2"
-                  >
-                    <Save className="w-4 h-4" /> Save All
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        </main>
 
         {/* Toast Container */}
         <div className="fixed bottom-4 right-4 space-y-2 z-50">

@@ -64,7 +64,7 @@ export default function Login() {
   };
 
   return (
-    <div className="flex justify-center items-center min-h-[80vh] bg-gray-100 px-3 py-4">
+    <div className="flex justify-center items-center min-h-[80vh] px-3 py-4">
       <form
         onSubmit={handleLogin}
         className="bg-white shadow-md p-6 rounded-md w-full max-w-sm relative"

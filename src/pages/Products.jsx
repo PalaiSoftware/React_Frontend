@@ -3,6 +3,24 @@ import { useNavigate } from 'react-router-dom';
 
 const API_BASE_URL = "http://127.0.0.1:8000/api";
 
+// Custom Header Component with User Profile
+const CustomHeader = ({ title, userName, onProfileClick, isUnitSection }) => {
+  return (
+    <div className="bg-gradient-to-r from-neutral-800 to-cyan-700 text-white p-4 sm:p-6 rounded-t-lg shadow-md">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+        <h1 className="text-2xl sm:text-3xl font-bold">{isUnitSection ? 'Units Information' : title}</h1>
+        <div
+          className="flex items-center space-x-2 cursor-pointer hover:opacity-80 transition-opacity mt-2 sm:mt-0"
+          onClick={onProfileClick}
+        >
+          <i className="fas fa-user-circle text-2xl sm:text-3xl"></i>
+          <span className="text-base sm:text-lg font-medium">{userName}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const Products = () => {
   const [allProducts, setAllProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -1198,74 +1216,6 @@ const Products = () => {
     );
   };
 
-  // Header
-  const Header = ({ title }) => (
-    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 space-y-2 sm:space-y-0">
-      <h2 className="text-xl sm:text-2xl font-bold">{title}</h2>
-      <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 w-full sm:w-auto">
-        <div className="flex items-center space-x-2 cursor-pointer" onClick={() => navigate('/profile')}>
-          <i className="fas fa-user-circle text-xl sm:text-2xl"></i>
-          <span className="text-sm sm:text-base">{userName}</span>
-        </div>
-        {!showUnitSection ? (
-          <>
-            <div className="relative w-full sm:w-auto">
-              <i className="fas fa-search absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-              <input
-                type="text"
-                className="w-full sm:w-64 pl-8 pr-2 py-1 h-10 sm:h-12 border rounded text-sm sm:text-base"
-                placeholder="Search all products..."
-                value={searchTerm}
-                onChange={e => { setSearchTerm(e.target.value); setAllProductsCurrentPage(1); }}
-              />
-            </div>
-            <select
-              className="w-full sm:w-48 border rounded px-2 py-1 h-10 sm:h-12 text-sm sm:text-base"
-              value={categoryFilter}
-              onChange={e => { setCategoryFilter(e.target.value); setAllProductsCurrentPage(1); }}
-            >
-              <option value="">All Categories</option>
-              {categories.map(category => (
-                <option key={category.id} value={category.id}>{category.name}</option>
-              ))}
-            </select>
-            {user && user.rid <= 7 && (
-              <>
-                <button className="w-full sm:w-auto px-4 py-2 bg-cyan-800 text-white rounded flex items-center text-sm sm:text-base" onClick={() => setShowAddProductPopup(true)}>
-                  Add Product
-                </button>
-                <button className="w-full sm:w-auto px-4 py-2 bg-cyan-800 text-white rounded flex items-center text-sm sm:text-base" onClick={() => setShowUnitSection(true)}>
-                  Units
-                </button>
-              </>
-            )}
-          </>
-        ) : (
-          <>
-            <button className="w-full sm:w-auto px-4 py-2 bg-cyan-800 text-white rounded flex items-center text-sm sm:text-base" onClick={() => { setShowUnitSection(false); fetchAllProducts(); }}>
-              Back
-            </button>
-            <div className="relative w-full sm:w-auto">
-              <i className="fas fa-search absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-              <input
-                type="text"
-                className="w-full sm:w-64 pl-8 pr-2 py-1 h-10 sm:h-12 border rounded text-sm sm:text-base"
-                placeholder="Search units..."
-                value={unitSearchTerm}
-                onChange={e => { setUnitSearchTerm(e.target.value); setUnitsCurrentPage(1); }}
-              />
-            </div>
-            {user && user.rid <= 7 && (
-              <button className="w-full sm:w-auto px-4 py-2 bg-cyan-800 text-white rounded flex items-center text-sm sm:text-base" onClick={() => setShowAddUnitPopup(true)}>
-                Add Unit
-              </button>
-            )}
-          </>
-        )}
-      </div>
-    </div>
-  );
-
   // Initial Fetch
   useEffect(() => {
     if (!user || !user.id || !authToken) {
@@ -1295,22 +1245,105 @@ const Products = () => {
 
   return (
     <main className="flex-1 p-2 sm:p-6">
-      <div className={`${showUnitSection ? 'hidden' : ''}`}>
-        <Header title="Products" />
-        <div className="bg-white p-4 rounded shadow">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg sm:text-xl font-semibold">All Products List</h3>
+      {/* Products Section */}
+      <div className={`${showUnitSection ? 'hidden' : 'block'} bg-white rounded-lg shadow-lg overflow-hidden`}>
+        <CustomHeader
+          title="Products"
+          userName={userName}
+          onProfileClick={() => navigate('/profile')}
+          isUnitSection={false}
+        />
+        <div className="p-4 sm:p-6">
+          {/* Controls */}
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 space-y-4 lg:space-y-0">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 w-full lg:w-auto">
+              <div className="relative w-full sm:w-64">
+                <i className="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                <input
+                  type="text"
+                  className="w-full pl-10 pr-3 py-2 border rounded-lg text-sm sm:text-base"
+                  placeholder="Search products..."
+                  value={searchTerm}
+                  onChange={e => { setSearchTerm(e.target.value); setAllProductsCurrentPage(1); }}
+                />
+              </div>
+              <select
+                className="w-full sm:w-48 border rounded-lg px-3 py-2 text-sm sm:text-base"
+                value={categoryFilter}
+                onChange={e => { setCategoryFilter(e.target.value); setAllProductsCurrentPage(1); }}
+              >
+                <option value="">All Categories</option>
+                {categories.map(category => (
+                  <option key={category.id} value={category.id}>{category.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 w-full lg:w-auto">
+              {user && user.rid <= 7 && (
+                <>
+                  <button className="px-4 py-2 bg-cyan-800 text-white rounded-lg text-sm sm:text-base" onClick={() => setShowAddProductPopup(true)}>
+                    Add Product
+                  </button>
+                  <button className="px-4 py-2 bg-cyan-800 text-white rounded-lg text-sm sm:text-base" onClick={() => setShowUnitSection(true)}>
+                    Units
+                  </button>
+                </>
+              )}
+            </div>
           </div>
-          {displayProducts()}
+
+          {/* Products Table/List */}
+          <div className="bg-gray-50 p-4 rounded-lg">
+            {displayProducts()}
+          </div>
         </div>
       </div>
-      <div className={`${showUnitSection ? '' : 'hidden'}`}>
-        <Header title="Units" />
-        <div className="bg-white p-4 rounded shadow">
-          <h3 className="text-lg sm:text-xl font-semibold mb-4">All Units</h3>
-          {displayUnits()}
+
+      {/* Units Section */}
+      <div className={`${showUnitSection ? 'block' : 'hidden'} bg-white rounded-lg shadow-lg overflow-hidden`}>
+        <CustomHeader
+          title="Units Information"
+          userName={userName}
+          onProfileClick={() => navigate('/profile')}
+          isUnitSection={true}
+        />
+        <div className="p-4 sm:p-6">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 space-y-4 lg:space-y-0">
+            <button
+              className="px-4 py-2 bg-cyan-800 text-white rounded-lg text-sm sm:text-base"
+              onClick={() => { setShowUnitSection(false); fetchAllProducts(); }}
+            >
+              Back to Products
+            </button>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 w-full lg:w-auto">
+              <div className="relative w-full sm:w-64">
+                <i className="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                <input
+                  type="text"
+                  className="w-full pl-10 pr-3 py-2 border rounded-lg text-sm sm:text-base"
+                  placeholder="Search units..."
+                  value={unitSearchTerm}
+                  onChange={e => { setUnitSearchTerm(e.target.value); setUnitsCurrentPage(1); }}
+                />
+              </div>
+              {user && user.rid <= 7 && (
+                <button
+                  className="px-4 py-2 bg-cyan-800 text-white rounded-lg text-sm sm:text-base"
+                  onClick={() => setShowAddUnitPopup(true)}
+                >
+                  Add Unit
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="bg-gray-50 p-4 rounded-lg">
+            {displayUnits()}
+          </div>
         </div>
       </div>
+
+      {/* Popups */}
       {showAddProductPopup && <AddProductPopup />}
       {showAddCategoryPopup && <AddCategoryPopup />}
       {showAddUnitPopup && <AddUnitPopup />}
