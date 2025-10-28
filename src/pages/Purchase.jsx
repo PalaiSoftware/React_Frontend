@@ -6,6 +6,10 @@ const paymentModeMap = {
   'credit_card': 1, 'debit_card': 2, 'cash': 3, 'upi': 4, 'bank_transfer': 5, 'phonepe': 6
 };
 
+const reversePaymentModeMap = Object.fromEntries(
+  Object.entries(paymentModeMap).map(([k, v]) => [v, k])
+);
+
 const useDebounce = (callback, delay) => {
   const timeoutRef = useRef(null);
   return (...args) => {
@@ -30,8 +34,29 @@ const Purchase = () => {
   const [purchaseItems, setPurchaseItems] = useState([]);
   const [editPurchaseItems, setEditPurchaseItems] = useState([]);
   const [editTransactionId, setEditTransactionId] = useState(null);
+  const [editOriginalPaidAmount, setEditOriginalPaidAmount] = useState(0);
   const [productsCache, setProductsCache] = useState([]);
   const [toast, setToast] = useState({ show: false, message: '' });
+  const [detailsCache, setDetailsCache] = useState({});
+  const [openDetails, setOpenDetails] = useState({});
+  const [vendorSearchResults, setVendorSearchResults] = useState([]);
+
+  // Edit form state (React way)
+  const [editForm, setEditForm] = useState({
+    billName: '',
+    dateTime: '',
+    paymentMode: 'cash',
+    absoluteDiscount: 0,
+    setPaidAmount: 0
+  });
+
+  // Totals for edit
+  const [editTotals, setEditTotals] = useState({
+    subtotal: 0,
+    payable: 0,
+    due: 0
+  });
+
   const itemsPerPage = 50;
 
   const showToast = (msg) => {
@@ -39,6 +64,9 @@ const Purchase = () => {
     setTimeout(() => setToast({ show: false, message: '' }), 3000);
   };
 
+  /* ------------------------------------------------------------------ */
+  /*  USER & INITIAL DATA                                               */
+  /* ------------------------------------------------------------------ */
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
@@ -64,7 +92,7 @@ const Purchase = () => {
 
   const fetchVendors = async () => {
     const token = localStorage.getItem('authToken');
-    if (!user.cid || !token) return;
+    if (!user.cid || !token) return [];
     try {
       const res = await fetch(`${API_BASE_URL}/vendors?cid=${user.cid}`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -81,6 +109,7 @@ const Purchase = () => {
       setVendorsList(vendors);
       return vendors;
     } catch (err) {
+      showToast('Failed to fetch vendors');
       return [];
     }
   };
@@ -102,7 +131,7 @@ const Purchase = () => {
       setAllPurchases(purchases);
       setFilteredPurchases(purchases);
     } catch (err) {
-      console.error(err);
+      showToast('Failed to fetch purchases');
     }
   };
 
@@ -113,6 +142,9 @@ const Purchase = () => {
     }
   }, [user.cid]);
 
+  /* ------------------------------------------------------------------ */
+  /*  SEARCH & PAGINATION                                               */
+  /* ------------------------------------------------------------------ */
   useEffect(() => {
     const lower = searchTerm.toLowerCase();
     const filtered = allPurchases.filter(p =>
@@ -130,6 +162,9 @@ const Purchase = () => {
   const paginated = filteredPurchases.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   const totalPages = Math.ceil(filteredPurchases.length / itemsPerPage);
 
+  /* ------------------------------------------------------------------ */
+  /*  PRODUCTS & UNITS                                                  */
+  /* ------------------------------------------------------------------ */
   const fetchProducts = async () => {
     if (productsCache.length > 0) return productsCache;
     const token = localStorage.getItem('authToken');
@@ -160,7 +195,60 @@ const Purchase = () => {
     }
   };
 
-  const AutocompleteInput = ({ value, onChange, onSelect, placeholder, products }) => {
+  const fetchProductDetails = async (productId) => {
+    const token = localStorage.getItem('authToken');
+    try {
+      const res = await fetch(`${API_BASE_URL}/units/${productId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      return data.product_info || {};
+    } catch (err) {
+      return {};
+    }
+  };
+
+  /* ------------------------------------------------------------------ */
+  /*  PURCHASE DETAILS                                                  */
+  /* ------------------------------------------------------------------ */
+  const fetchPurchaseDetails = async (transactionId) => {
+    if (detailsCache[transactionId]) return detailsCache[transactionId];
+
+    const token = localStorage.getItem('authToken');
+    try {
+      const res = await fetch(`${API_BASE_URL}/purchases-by-transaction-id`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ transaction_id: transactionId })
+      });
+      const data = await res.json();
+      const details = data.data;
+      setDetailsCache(prev => ({ ...prev, [transactionId]: details }));
+      return details;
+    } catch (err) {
+      showToast('Failed to load details');
+      return null;
+    }
+  };
+
+  const toggleDetails = async (transactionId) => {
+    const tid = transactionId.toString();
+    const willOpen = !openDetails[tid];
+
+    if (willOpen && !detailsCache[tid]) {
+      await fetchPurchaseDetails(tid);
+    }
+
+    setOpenDetails(prev => ({ ...prev, [tid]: willOpen }));
+  };
+
+  /* ------------------------------------------------------------------ */
+  /*  AUTOCOMPLETE INPUT                                                */
+  /* ------------------------------------------------------------------ */
+  const AutocompleteInput = ({ value, onChange, onSelect, placeholder, products, itemId, isEdit }) => {
     const [suggestions, setSuggestions] = useState([]);
     const [show, setShow] = useState(false);
     const inputRef = useRef(null);
@@ -199,16 +287,16 @@ const Purchase = () => {
             handleInput(e.target.value);
           }}
           placeholder={placeholder}
-          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-2 py-1 border rounded text-sm"
         />
         {show && suggestions.length > 0 && (
-          <div className="absolute z-10 w-full bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto mt-1">
+          <div className="absolute z-20 w-full bg-white border rounded shadow-lg max-h-40 overflow-y-auto mt-1">
             {suggestions.map(p => (
               <div
                 key={p.id}
-                className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                onClick={() => {
-                  onSelect(p);
+                className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                onClick={async () => {
+                  onSelect(p, itemId, isEdit);
                   setShow(false);
                 }}
               >
@@ -221,6 +309,9 @@ const Purchase = () => {
     );
   };
 
+  /* ------------------------------------------------------------------ */
+  /*  ITEM ROWS                                                         */
+  /* ------------------------------------------------------------------ */
   const addItemRow = (isEdit = false) => {
     const newItem = {
       id: Date.now(),
@@ -234,30 +325,21 @@ const Purchase = () => {
       per_item_cost: 0,
       selling_price: 0
     };
-    if (isEdit) {
-      setEditPurchaseItems(prev => [...prev, newItem]);
-    } else {
-      setPurchaseItems(prev => [...prev, newItem]);
-    }
+    if (isEdit) setEditPurchaseItems(prev => [...prev, newItem]);
+    else setPurchaseItems(prev => [...prev, newItem]);
   };
 
   const removeItem = (id, isEdit = false) => {
-    if (isEdit) {
-      setEditPurchaseItems(prev => prev.filter(i => i.id !== id));
-    } else {
-      setPurchaseItems(prev => prev.filter(i => i.id !== id));
-    }
+    if (isEdit) setEditPurchaseItems(prev => prev.filter(i => i.id !== id));
+    else setPurchaseItems(prev => prev.filter(i => i.id !== id));
   };
 
   const updateItem = (id, field, value, isEdit = false) => {
-    const update = (prev) => prev.map(item =>
+    const updater = (prev) => prev.map(item =>
       item.id === id ? { ...item, [field]: value } : item
     );
-    if (isEdit) {
-      setEditPurchaseItems(update);
-    } else {
-      setPurchaseItems(update);
-    }
+    if (isEdit) setEditPurchaseItems(updater);
+    else setPurchaseItems(updater);
   };
 
   const handleProductSelect = async (product, itemId, isEdit = false) => {
@@ -270,227 +352,323 @@ const Purchase = () => {
       updateItem(itemId, 'unit_name', units[0].name || units[0].unit_name, isEdit);
     }
 
-    const token = localStorage.getItem('authToken');
-    try {
-      const res = await fetch(`${API_BASE_URL}/units/${product.id}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await res.json();
-      const info = data.product_info || {};
-      updateItem(itemId, 'per_item_cost', info.purchase_price || 0, isEdit);
-      updateItem(itemId, 'selling_price', info.post_gst_sale_cost || 0, isEdit);
-    } catch (err) { }
+    const info = await fetchProductDetails(product.id);
+    updateItem(itemId, 'per_item_cost', info.purchase_price || 0, isEdit);
+    updateItem(itemId, 'selling_price', info.post_gst_sale_cost || 0, isEdit);
   };
 
-  const calculateTotals = (items, absDiscount = 0) => {
+  /* ------------------------------------------------------------------ */
+  /*  CALCULATIONS                                                      */
+  /* ------------------------------------------------------------------ */
+  const calculateTotals = (items, absoluteDiscount = 0, paidAmount = 0, setPaidAdjustment = 0) => {
     let subtotal = 0;
     items.forEach(item => {
-      let total = (item.quantity || 0) * (item.per_item_cost || 0);
-      total -= total * (item.discount || 0) / 100;
-      total += total * (item.gst || 0) / 100;
+      let total = item.quantity * item.per_item_cost;
+      total -= total * (item.discount / 100);
+      total += total * (item.gst / 100);
       subtotal += total;
     });
-    const payable = Math.max(0, subtotal - absDiscount);
-    return { subtotal, payable };
+
+    const payable = Math.max(0, subtotal - absoluteDiscount);
+    const newPaid = paidAmount + setPaidAdjustment;
+    const due = Math.max(0, payable - newPaid);
+
+    return { subtotal, payable, due, newPaid };
   };
 
-  const savePurchase = async () => {
-    const token = localStorage.getItem('authToken');
-    if (!selectedVendor.id) return showToast('Select a vendor');
-    if (purchaseItems.length === 0) return showToast('Add at least one item');
+  /* ------------------------------------------------------------------ */
+  /*  CURRENCY SYMBOL                                                   */
+  /* ------------------------------------------------------------------ */
+  const getCurrencySymbol = () => {
+    const company = JSON.parse(localStorage.getItem('selectedCompany') || '{}');
+    return company.currency || '₹';
+  };
 
-    const products = purchaseItems.map(i => ({
-      product_id: i.product_id,
-      quantity: parseFloat(i.quantity).toFixed(3),
-      unit_id: i.unit_id,
-      p_price: parseFloat(i.per_item_cost).toFixed(2),
-      s_price: parseFloat(i.selling_price).toFixed(2),
-      dis: i.discount || 0,
-      gst: parseFloat(i.gst).toFixed(2)
-    }));
+  /* ------------------------------------------------------------------ */
+  /*  VENDOR SEARCH                                                     */
+  /* ------------------------------------------------------------------ */
+  const searchVendors = async () => {
+    const name = document.getElementById('vendorNameSearch')?.value.trim().toLowerCase() || '';
+    const pan = document.getElementById('vendorPanSearch')?.value.trim().toLowerCase() || '';
+    const gst = document.getElementById('vendorGstSearch')?.value.trim().toLowerCase() || '';
+    const phone = document.getElementById('vendorPhoneSearch')?.value.trim().toLowerCase() || '';
+    const email = document.getElementById('vendorEmailSearch')?.value.trim().toLowerCase() || '';
+
+    const filtered = vendorsList.filter(v =>
+      (!name || v.vendor_name.toLowerCase().includes(name)) &&
+      (!pan || v.pan.toLowerCase().includes(pan)) &&
+      (!gst || v.gst_no.toLowerCase().includes(gst)) &&
+      (!phone || v.phone.toLowerCase().includes(phone)) &&
+      (!email || v.email.toLowerCase().includes(email))
+    );
+    setVendorSearchResults(filtered);
+  };
+
+  /* ------------------------------------------------------------------ */
+  /*  ADD VENDOR                                                        */
+  /* ------------------------------------------------------------------ */
+  const saveNewVendor = async () => {
+    const token = localStorage.getItem('authToken');
+    const data = {
+      name: document.getElementById('addVendorName').value.trim(),
+      email: document.getElementById('addVendorEmail').value.trim(),
+      phone: document.getElementById('addVendorPhone').value.trim(),
+      address: document.getElementById('addVendorAddress').value.trim(),
+      gst_no: document.getElementById('addVendorGst').value.trim(),
+      pan: document.getElementById('addVendorPan').value.trim(),
+      uid: user.id,
+      cid: user.cid
+    };
+
+    if (!data.name) {
+      showToast('Vendor name is required');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/vendors`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(data)
+      });
+      const result = await res.json();
+      if (res.ok && result.purchase_client) {
+        const newVendor = {
+          id: result.purchase_client.id,
+          vendor_name: result.purchase_client.name,
+          email: data.email,
+          phone: data.phone,
+          gst_no: data.gst_no,
+          pan: data.pan
+        };
+        setVendorsList(prev => [...prev, newVendor]);
+        setSelectedVendor({ id: newVendor.id, name: newVendor.vendor_name });
+        setShowAddVendor(false);
+        setShowAddPurchase(true);
+        showToast('Vendor added successfully');
+      } else {
+        showToast(result.message || 'Failed to add vendor');
+      }
+    } catch (err) {
+      showToast('Failed to add vendor');
+    }
+  };
+
+  /* ------------------------------------------------------------------ */
+  /*  SAVE PURCHASE                                                     */
+  /* ------------------------------------------------------------------ */
+  const savePurchase = async () => {
+    const billName = document.getElementById('purchaseBillName').value.trim();
+    const paymentMode = document.getElementById('purchasePaymentMode').value;
+    const dateTime = document.getElementById('purchaseDateTime').value;
+    const paidAmount = parseFloat(document.getElementById('purchasePaidAmount').value) || 0;
+    const absoluteDiscount = parseFloat(document.getElementById('purchaseAbsoluteDiscount').value) || 0;
+
+    if (!selectedVendor.id) {
+      showToast('Please select a vendor');
+      return;
+    }
+    if (!dateTime) {
+      showToast('Please select date and time');
+      return;
+    }
+
+    const products = purchaseItems
+      .filter(p => p.product_id && p.quantity > 0 && p.unit_id)
+      .map(p => ({
+        product_id: p.product_id,
+        quantity: parseFloat(p.quantity).toFixed(3),
+        unit_id: p.unit_id,
+        p_price: parseFloat(p.per_item_cost).toFixed(2),
+        s_price: parseFloat(p.selling_price).toFixed(2),
+        dis: p.discount,
+        gst: parseFloat(p.gst).toFixed(2)
+      }));
+
+    if (products.length === 0) {
+      showToast('Add at least one valid product');
+      return;
+    }
 
     const payload = {
       products,
       vendor_id: selectedVendor.id,
-      payment_mode: paymentModeMap[document.getElementById('purchasePaymentMode')?.value] || 3,
-      purchase_date: new Date(document.getElementById('purchaseDateTime')?.value).toISOString().slice(0, 16) + ':00',
-      absolute_discount: parseFloat(document.getElementById('purchaseAbsoluteDiscount')?.value || 0).toFixed(2),
-      paid_amount: parseFloat(document.getElementById('purchasePaidAmount')?.value || 0).toFixed(2),
-      payable_amount: parseFloat(document.getElementById('purchasePayableAmount')?.value || 0).toFixed(2),
-      total_amount: parseFloat(document.getElementById('purchaseFinalTotal')?.value || 0).toFixed(2),
-      bill_name: document.getElementById('purchaseBillName')?.value
+      payment_mode: paymentModeMap[paymentMode] || 3,
+      purchase_date: dateTime.replace('T', ' ') + ':00',
+      absolute_discount: absoluteDiscount.toFixed(2),
+      paid_amount: paidAmount.toFixed(2),
+      payable_amount: (calculateTotals(purchaseItems, absoluteDiscount, 0).payable).toFixed(2),
+      total_amount: calculateTotals(purchaseItems, 0, 0).subtotal.toFixed(2)
     };
+    if (billName) payload.bill_name = billName;
 
+    const token = localStorage.getItem('authToken');
     try {
       const res = await fetch(`${API_BASE_URL}/purchase`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(payload)
       });
-      const data = await res.json();
-      if (data.message === 'Purchases recorded successfully') {
-        showToast('Purchase added!');
-        setShowAddPurchase(false);
-        setPurchaseItems([]);
+      const result = await res.json();
+      if (result.message === 'Purchases recorded successfully') {
+        showToast('Purchase added successfully');
+        resetAddPurchase();
         fetchPurchases();
+      } else {
+        showToast('Failed to save purchase');
       }
     } catch (err) {
-      showToast('Failed to save');
+      showToast('Failed to save purchase');
+    }
+  };
+
+  const resetAddPurchase = () => {
+    setPurchaseItems([]);
+    setSelectedVendor({ id: '', name: '' });
+    setShowAddPurchase(false);
+    setShowSearchVendor(false);
+    addItemRow(false);
+  };
+
+  /* ------------------------------------------------------------------ */
+  /*  EDIT PURCHASE                                                     */
+  /* ------------------------------------------------------------------ */
+  const openEdit = async (transactionId) => {
+    const details = await fetchPurchaseDetails(transactionId);
+    if (!details) return;
+
+    setEditTransactionId(transactionId);
+    setEditOriginalPaidAmount(parseFloat(details.paid_amount) || 0);
+    setSelectedVendor({ id: details.vendor_id, name: details.vendor_name });
+
+    // Set form state
+    setEditForm({
+      billName: details.bill_name || '',
+      dateTime: details.date.slice(0, 16),
+      paymentMode: reversePaymentModeMap[details.payment_mode] || 'cash',
+      absoluteDiscount: parseFloat(details.absolute_discount) || 0,
+      setPaidAmount: 0
+    });
+
+    const items = details.products.map(p => ({
+      id: Date.now() + Math.random(),
+      product_id: p.product_id,
+      product_name: p.product_name,
+      quantity: p.quantity,
+      unit_id: p.unit_id,
+      unit_name: p.unit_name,
+      discount: p.discount || 0,
+      gst: p.gst || 0,
+      per_item_cost: p.per_item_cost,
+      selling_price: p.selling_price || 0
+    }));
+
+    setEditPurchaseItems(items.length > 0 ? items : [createEmptyItem()]);
+    setShowEditPurchase(true);
+  };
+
+  const createEmptyItem = () => ({
+    id: Date.now(),
+    product_id: '',
+    product_name: '',
+    quantity: 0,
+    unit_id: '',
+    unit_name: '',
+    discount: 0,
+    gst: 0,
+    per_item_cost: 0,
+    selling_price: 0
+  });
+
+  const saveEditedPurchase = async () => {
+    const products = editPurchaseItems
+      .filter(p => p.product_id && p.quantity > 0 && p.unit_id)
+      .map(p => ({
+        product_id: p.product_id,
+        quantity: parseFloat(p.quantity).toFixed(3),
+        unit_id: p.unit_id,
+        p_price: parseFloat(p.per_item_cost).toFixed(2),
+        s_price: parseFloat(p.selling_price).toFixed(2),
+        dis: p.discount,
+        gst: parseFloat(p.gst).toFixed(2)
+      }));
+
+    if (products.length === 0) {
+      showToast('Add at least one valid product');
+      return;
+    }
+
+    const payload = {
+      bill_name: editForm.billName,
+      vendor_id: selectedVendor.id,
+      payment_mode: paymentModeMap[editForm.paymentMode] || 3,
+      updated_at: editForm.dateTime.replace('T', ' ') + ':00',
+      absolute_discount: editForm.absoluteDiscount.toFixed(2),
+      set_paid_amount: editForm.setPaidAmount.toFixed(2),
+      products
+    };
+
+    const token = localStorage.getItem('authToken');
+    try {
+      const res = await fetch(`${API_BASE_URL}/transactions/${editTransactionId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      const result = await res.json();
+      if (result.status === 'success') {
+        showToast('Purchase updated');
+        setShowEditPurchase(false);
+        fetchPurchases();
+        setDetailsCache(prev => ({ ...prev, [editTransactionId]: null }));
+      } else {
+        showToast('Failed to update');
+      }
+    } catch (err) {
+      showToast('Failed to update');
     }
   };
 
   const deletePurchase = async (id) => {
-    if (!window.confirm('Delete this purchase?')) return;
+    if (!confirm('Delete this purchase?')) return;
     const token = localStorage.getItem('authToken');
     try {
       await fetch(`${API_BASE_URL}/destroy-purchase/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      showToast('Deleted');
+      showToast('Purchase deleted');
       fetchPurchases();
     } catch (err) {
-      showToast('Failed');
+      showToast('Failed to delete');
     }
   };
 
-  const openEdit = async (transactionId) => {
-    const token = localStorage.getItem('authToken');
-    try {
-      const res = await fetch(`${API_BASE_URL}/purchases-by-transaction-id`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ transaction_id: transactionId })
-      });
-      const data = await res.json();
-      const details = data.data;
-
-      setEditTransactionId(transactionId);
-      setShowEditPurchase(true);
-
-      // Populate form
-      const setVal = (id, val) => document.getElementById(id)?.setAttribute('value', val);
-      setVal('editPurchaseBillName', details.bill_name || '');
-      setVal('editVendorName', details.vendor_name || '');
-      setVal('editPurchaseDateTime', details.date.slice(0, 16));
-      document.getElementById('editPurchasePaymentMode').value = Object.keys(paymentModeMap).find(k => paymentModeMap[k] === details.payment_mode) || 'cash';
-      setVal('editPurchaseFinalTotal', parseFloat(details.total_amount).toFixed(2));
-      setVal('editPurchaseAbsoluteDiscount', parseFloat(details.absolute_discount).toFixed(2));
-      setVal('editPurchasePayableAmount', parseFloat(details.payable_amount).toFixed(2));
-      setVal('editPurchasePaidAmount', parseFloat(details.paid_amount).toFixed(2));
-      setVal('editPurchaseDueAmount', parseFloat(details.due_amount).toFixed(2));
-
-      const items = details.products.map(p => ({
-        id: Date.now() + Math.random(),
-        product_id: p.product_id,
-        product_name: p.product_name,
-        quantity: p.quantity,
-        unit_id: p.unit_id,
-        unit_name: p.unit_name,
-        discount: p.discount || 0,
-        gst: p.gst || 0,
-        per_item_cost: p.per_item_cost,
-        selling_price: p.selling_price || 0
-      }));
-      setEditPurchaseItems(items.length ? items : []);
-    } catch (err) {
-      showToast('Failed to load');
+  // Calculate Edit Totals
+  useEffect(() => {
+    if (showEditPurchase) {
+      const { subtotal, payable, due } = calculateTotals(
+        editPurchaseItems,
+        editForm.absoluteDiscount,
+        editOriginalPaidAmount,
+        editForm.setPaidAmount
+      );
+      setEditTotals({ subtotal, payable, due });
     }
-  };
+  }, [editPurchaseItems, editForm, editOriginalPaidAmount, showEditPurchase]);
 
-  const saveEdit = async () => {
-    const token = localStorage.getItem('authToken');
-    const products = editPurchaseItems.map(i => ({
-      product_id: i.product_id,
-      quantity: parseFloat(i.quantity).toFixed(3),
-      unit_id: i.unit_id,
-      p_price: parseFloat(i.per_item_cost).toFixed(2),
-      s_price: parseFloat(i.selling_price).toFixed(2),
-      dis: i.discount || 0,
-      gst: parseFloat(i.gst).toFixed(2)
-    }));
-
-    const payload = {
-      bill_name: document.getElementById('editPurchaseBillName').value,
-      vendor_id: selectedVendor.id || vendorsList.find(v => v.vendor_name === document.getElementById('editVendorName').value)?.id,
-      payment_mode: paymentModeMap[document.getElementById('editPurchasePaymentMode').value] || 3,
-      updated_at: new Date(document.getElementById('editPurchaseDateTime').value).toISOString().slice(0, 16) + ':00',
-      absolute_discount: parseFloat(document.getElementById('editPurchaseAbsoluteDiscount').value || 0).toFixed(2),
-      set_paid_amount: parseFloat(document.getElementById('editPurchaseSetPaidAmount').value || 0).toFixed(2),
-      products
-    };
-
-    try {
-      const res = await fetch(`${API_BASE_URL}/transactions/${editTransactionId}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        showToast('Updated!');
-        setShowEditPurchase(false);
-        fetchPurchases();
-      }
-    } catch (err) {
-      showToast('Failed');
-    }
-  };
-
-  const addVendor = async (e) => {
-    e.preventDefault();
-    const token = localStorage.getItem('authToken');
-    const formData = new FormData(e.target);
-    const data = {
-      name: formData.get('name'),
-      email: formData.get('email'),
-      phone: formData.get('phone'),
-      address: formData.get('address'),
-      gst_no: formData.get('gst'),
-      pan: formData.get('pan'),
-      uid: user.id,
-      cid: user.cid
-    };
-
-    try {
-      const res = await fetch(`${API_BASE_URL}/vendors`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data)
-      });
-      const result = await res.json();
-      if (result.purchase_client) {
-        const newV = {
-          id: result.purchase_client.id,
-          vendor_name: result.purchase_client.name
-        };
-        setVendorsList(prev => [...prev, newV]);
-        setSelectedVendor(newV);
-        setShowAddVendor(false);
-        setShowAddPurchase(true);
-        showToast('Vendor added');
-      }
-    } catch (err) {
-      showToast('Failed');
-    }
-  };
-
-  const [expandedRow, setExpandedRow] = useState(null);
-  const toggleDetails = (id) => {
-    setExpandedRow(expandedRow === id ? null : id);
-  };
-
+  /* ------------------------------------------------------------------ */
+  /*  RENDER                                                            */
+  /* ------------------------------------------------------------------ */
   return (
     <>
       {/* Header */}
@@ -538,155 +716,484 @@ const Purchase = () => {
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">S.No</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bill Name</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vendor</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">By</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">S.No</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bill Name</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vendor</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payment</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">By</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {paginated.map((p, idx) => (
-                  <React.Fragment key={p.transaction_id}>
-                    <tr>
-                      <td className="px-4 py-3 text-sm">{(currentPage - 1) * itemsPerPage + idx + 1}</td>
-                      <td className="px-4 py-3 text-sm">{p.bill_name || 'N/A'}</td>
-                      <td className="px-4 py-3 text-sm">{p.vendor_name}</td>
-                      <td className="px-4 py-3 text-sm">{p.payment_mode}</td>
-                      <td className="px-4 py-3 text-sm">{p.date}</td>
-                      <td className="px-4 py-3 text-sm">{p.purchased_by || 'Unknown'}</td>
-                      <td className="px-4 py-3 text-sm">
-                        <button onClick={() => toggleDetails(p.transaction_id)} className="text-blue-600 hover:underline mr-2">View</button>
-                        <button onClick={() => openEdit(p.transaction_id)} className="text-green-600 hover:underline mr-2">Edit</button>
-                        <button onClick={() => deletePurchase(p.transaction_id)} className="text-red-600 hover:underline">Delete</button>
-                      </td>
-                    </tr>
-                    {expandedRow === p.transaction_id && (
+                {paginated.map((p, idx) => {
+                  const tid = p.transaction_id.toString();
+                  const isOpen = openDetails[tid];
+                  const details = detailsCache[tid];
+                  const currency = getCurrencySymbol();
+
+                  return (
+                    <React.Fragment key={tid}>
                       <tr>
-                        <td colSpan="7" className="px-4 py-3 bg-gray-50">
-                          <div className="text-sm">Details loading...</div>
+                        <td className="px-4 py-3 text-sm">{(currentPage - 1) * itemsPerPage + idx + 1}</td>
+                        <td className="px-4 py-3 text-sm">{p.bill_name || 'N/A'}</td>
+                        <td className="px-4 py-3 text-sm">{p.vendor_name}</td>
+                        <td className="px-4 py-3 text-sm">{p.payment_mode}</td>
+                        <td className="px-4 py-3 text-sm">{p.date}</td>
+                        <td className="px-4 py-3 text-sm">{p.purchased_by || 'Unknown'}</td>
+                        <td className="px-4 py-3 text-sm flex gap-2">
+                          <button onClick={() => toggleDetails(tid)} className="text-blue-600 hover:underline">
+                            {isOpen ? 'Hide' : 'View'}
+                          </button>
+                          <button onClick={() => openEdit(p.transaction_id)} className="text-green-600 hover:underline">Edit</button>
+                          <button onClick={() => deletePurchase(p.transaction_id)} className="text-red-600 hover:underline">Delete</button>
                         </td>
                       </tr>
-                    )}
-                  </React.Fragment>
-                ))}
+                      {isOpen && (
+                        <tr>
+                          <td colSpan={7} className="px-4 py-3 bg-gray-50">
+                            {details ? (
+                              <div className="text-xs">
+                                <div className="grid grid-cols-3 gap-2 mb-3">
+                                  <span><strong>Bill:</strong> {details.bill_name}</span>
+                                  <span><strong>ID:</strong> {p.transaction_id}</span>
+                                  <span><strong>Date:</strong> {p.date}</span>
+                                </div>
+                                <div className="grid grid-cols-3 gap-2 mb-3">
+                                  <span><strong>Vendor:</strong> {p.vendor_name}</span>
+                                  <span><strong>By:</strong> {p.purchased_by}</span>
+                                  <span><strong>Pay:</strong> {p.payment_mode}</span>
+                                </div>
+                                <hr className="my-2" />
+                                <h4 className="font-medium mb-1">Items</h4>
+                                <table className="min-w-full text-xs">
+                                  <thead>
+                                    <tr className="bg-gray-100">
+                                      <th className="px-2 py-1 text-left">Product</th>
+                                      <th className="px-2 py-1 text-left">Qty</th>
+                                      <th className="px-2 py-1 text-left">Unit</th>
+                                      <th className="px-2 py-1 text-left">Disc</th>
+                                      <th className="px-2 py-1 text-left">GST</th>
+                                      <th className="px-2 py-1 text-left">Cost</th>
+                                      <th className="px-2 py-1 text-left">Total</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {details.products.map(prod => (
+                                      <tr key={prod.id}>
+                                        <td className="px-2 py-1">{prod.product_name}</td>
+                                        <td className="px-2 py-1">{prod.quantity}</td>
+                                        <td className="px-2 py-1">{prod.unit_name}</td>
+                                        <td className="px-2 py-1">{prod.discount}</td>
+                                        <td className="px-2 py-1">{prod.gst}</td>
+                                        <td className="px-2 py-1">{currency}{parseFloat(prod.per_item_cost).toFixed(2)}</td>
+                                        <td className="px-2 py-1">{currency}{parseFloat(prod.per_product_total).toFixed(2)}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                  <tfoot className="bg-gray-50">
+                                    <tr><td colSpan={6} className="text-right font-medium">Total:</td><td>{currency}{parseFloat(details.total_amount).toFixed(2)}</td></tr>
+                                    <tr><td colSpan={6} className="text-right font-medium">Discount:</td><td>{currency}{parseFloat(details.absolute_discount).toFixed(2)}</td></tr>
+                                    <tr><td colSpan={6} className="text-right font-medium">Payable:</td><td>{currency}{parseFloat(details.payable_amount).toFixed(2)}</td></tr>
+                                    <tr><td colSpan={6} className="text-right font-medium">Paid:</td><td>{currency}{parseFloat(details.paid_amount).toFixed(2)}</td></tr>
+                                    <tr><td colSpan={6} className="text-right font-medium">Due:</td><td>{currency}{parseFloat(details.due_amount).toFixed(2)}</td></tr>
+                                  </tfoot>
+                                </table>
+                              </div>
+                            ) : (
+                              <div className="text-center py-2 text-gray-500">Loading...</div>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
           {/* Mobile Cards */}
           <div className="md:hidden">
-            {paginated.map((p, idx) => (
-              <div key={p.transaction_id} className="border-b p-4">
-                <div className="font-semibold">{p.bill_name || 'N/A'}</div>
-                <div className="text-sm text-gray-600">Vendor: {p.vendor_name}</div>
-                <div className="text-sm text-gray-600">Date: {p.date}</div>
-                <div className="mt-2 flex gap-2">
-                  <button onClick={() => toggleDetails(p.transaction_id)} className="text-xs text-blue-600">View</button>
-                  <button onClick={() => openEdit(p.transaction_id)} className="text-xs text-green-600">Edit</button>
-                  <button onClick={() => deletePurchase(p.transaction_id)} className="text-xs text-red-600">Delete</button>
+            {paginated.map((p, idx) => {
+              const tid = p.transaction_id.toString();
+              const isOpen = openDetails[tid];
+              const details = detailsCache[tid];
+              const currency = getCurrencySymbol();
+
+              return (
+                <div key={tid} className="border-b p-4">
+                  <div className="font-semibold">{p.bill_name || 'N/A'}</div>
+                  <div className="text-sm text-gray-600">Vendor: {p.vendor_name}</div>
+                  <div className="text-sm text-gray-600">Date: {p.date}</div>
+                  <div className="mt-2 flex gap-2 flex-wrap text-xs">
+                    <button onClick={() => toggleDetails(tid)} className="text-blue-600 underline">{isOpen ? 'Hide' : 'View'}</button>
+                    <button onClick={() => openEdit(p.transaction_id)} className="text-green-600 underline">Edit</button>
+                    <button onClick={() => deletePurchase(p.transaction_id)} className="text-red-600 underline">Delete</button>
+                  </div>
+                  {isOpen && details && (
+                    <div className="mt-3 bg-gray-50 p-3 rounded text-xs">
+                      <div className="grid grid-cols-2 gap-1 mb-2">
+                        <span><strong>Bill:</strong> {details.bill_name}</span>
+                        <span><strong>ID:</strong> {p.transaction_id}</span>
+                      </div>
+                      <h4 className="font-medium mb-1">Items</h4>
+                      {details.products.map(prod => (
+                        <div key={prod.id} className="flex justify-between">
+                          <span>{prod.product_name}</span>
+                          <span>{prod.quantity} {prod.unit_name} @ {currency}{parseFloat(prod.per_item_cost).toFixed(2)}</span>
+                        </div>
+                      ))}
+                      <hr className="my-2" />
+                      <div className="grid grid-cols-2 gap-1">
+                        <span>Total:</span><span className="text-right">{currency}{parseFloat(details.total_amount).toFixed(2)}</span>
+                        <span>Discount:</span><span className="text-right">{currency}{parseFloat(details.absolute_discount).toFixed(2)}</span>
+                        <span>Payable:</span><span className="text-right">{currency}{parseFloat(details.payable_amount).toFixed(2)}</span>
+                        <span>Paid:</span><span className="text-right">{currency}{parseFloat(details.paid_amount).toFixed(2)}</span>
+                        <span>Due:</span><span className="text-right">{currency}{parseFloat(details.due_amount).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Pagination */}
           <div className="p-4 flex justify-between items-center border-t">
-            <button
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage(p => p - 1)}
-              className="px-3 py-1 rounded border disabled:opacity-50"
-            >
-              Previous
-            </button>
+            <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="px-3 py-1 rounded border disabled:opacity-50">Previous</button>
             <div className="flex gap-1">
               {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                 const page = Math.max(1, currentPage - 2) + i;
                 if (page > totalPages) return null;
                 return (
-                  <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    className={`px-3 py-1 rounded ${page === currentPage ? 'bg-blue-600 text-white' : 'border'}`}
-                  >
+                  <button key={page} onClick={() => setCurrentPage(page)} className={`px-3 py-1 rounded ${page === currentPage ? 'bg-blue-600 text-white' : 'border'}`}>
                     {page}
                   </button>
                 );
               })}
             </div>
-            <button
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage(p => p + 1)}
-              className="px-3 py-1 rounded border disabled:opacity-50"
-            >
-              Next
-            </button>
+            <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="px-3 py-1 rounded border disabled:opacity-50">Next</button>
           </div>
         </div>
       </div>
 
-      {/* Search Vendor Modal */}
+      {/* Popups */}
       {showSearchVendor && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-screen overflow-y-auto">
             <div className="p-4 border-b flex justify-between items-center">
               <h2 className="text-xl font-bold">Search Vendor</h2>
-              <button onClick={() => setShowSearchVendor(false)} className="text-gray-500 hover:text-gray-700">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+              <button onClick={() => setShowSearchVendor(false)} className="text-gray-500 hover:text-gray-700">×</button>
             </div>
             <div className="p-4">
-              <table className="w-full mb-4">
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <input id="vendorNameSearch" placeholder="Name" className="px-3 py-2 border rounded" onInput={searchVendors} />
+                <input id="vendorPanSearch" placeholder="PAN" className="px-3 py-2 border rounded" onInput={searchVendors} />
+                <input id="vendorGstSearch" placeholder="GST" className="px-3 py-2 border rounded" onInput={searchVendors} />
+                <input id="vendorPhoneSearch" placeholder="Phone" className="px-3 py-2 border rounded" onInput={searchVendors} />
+                <input id="vendorEmailSearch" placeholder="Email" className="px-3 py-2 border rounded col-span-2" onInput={searchVendors} />
+              </div>
+              <div className="flex gap-2 mb-4">
+                <button onClick={() => setShowAddVendor(true)} className="px-4 py-2 bg-blue-600 text-white rounded">Add Vendor</button>
+                <button onClick={searchVendors} className="px-4 py-2 border rounded">Search</button>
+              </div>
+              <table className="w-full text-sm">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="p-2 text-left">Name</th>
+                    <th className="p-2 text-left">PAN</th>
+                    <th className="p-2 text-left">GST</th>
+                    <th className="p-2 text-left">Phone</th>
+                    <th className="p-2 text-left">Action</th>
+                  </tr>
+                </thead>
                 <tbody>
-                  <tr><td className="pb-2">Name:</td><td><input id="vendorNameSearch" className="w-full px-3 py-2 border rounded-md" /></td></tr>
-                  <tr><td className="pb-2">PAN:</td><td><input id="vendorPanSearch" className="w-full px-3 py-2 border rounded-md" /></td></tr>
-                  <tr><td className="pb-2">GST:</td><td><input id="vendorGstSearch" className="w-full px-3 py-2 border rounded-md" /></td></tr>
-                  <tr><td className="pb-2">Phone:</td><td><input id="vendorPhoneSearch" className="w-full px-3 py-2 border rounded-md" /></td></tr>
+                  {vendorSearchResults.length > 0 ? vendorSearchResults.map(v => (
+                    <tr key={v.id} className="border-b">
+                      <td className="p-2">{v.vendor_name}</td>
+                      <td className="p-2">{v.pan}</td>
+                      <td className="p-2">{v.gst_no}</td>
+                      <td className="p-2">{v.phone}</td>
+                      <td className="p-2">
+                        <button
+                          onClick={() => {
+                            setSelectedVendor({ id: v.id, name: v.vendor_name });
+                            setShowSearchVendor(false);
+                            setShowAddPurchase(true);
+                            addItemRow(false);
+                          }}
+                          className="text-blue-600 hover:underline"
+                        >
+                          Select
+                        </button>
+                      </td>
+                    </tr>
+                  )) : (
+                    <tr><td colSpan={5} className="p-4 text-center text-gray-500">No vendors found</td></tr>
+                  )}
                 </tbody>
               </table>
-              <div className="flex gap-2 mb-4">
-                <button onClick={() => { setShowAddVendor(true); setShowSearchVendor(false); }} className="bg-gray-600 text-white px-4 py-2 rounded-md">Add Vendor</button>
-                <button onClick={async () => {
-                  const name = document.getElementById('vendorNameSearch').value.toLowerCase();
-                  const filtered = vendorsList.filter(v => v.vendor_name.toLowerCase().includes(name));
-                  setVendorsList(filtered);
-                }} className="bg-blue-600 text-white px-4 py-2 rounded-md">Search</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAddVendor && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-md w-full">
+            <div className="p-4 border-b flex justify-between items-center">
+              <button onClick={() => setShowAddVendor(false)} className="text-gray-500">←</button>
+              <h2 className="text-xl font-bold">Add Vendor</h2>
+              <button onClick={() => setShowAddVendor(false)} className="text-gray-500">×</button>
+            </div>
+            <div className="p-4 space-y-3">
+              <input id="addVendorName" placeholder="Name *" className="w-full px-3 py-2 border rounded" />
+              <input id="addVendorPan" placeholder="PAN" className="w-full px-3 py-2 border rounded" />
+              <input id="addVendorGst" placeholder="GST" className="w-full px-3 py-2 border rounded" />
+              <input id="addVendorPhone" placeholder="Phone" className="w-full px-3 py-2 border rounded" />
+              <input id="addVendorEmail" placeholder="Email" className="w-full px-3 py-2 border rounded" />
+              <input id="addVendorAddress" placeholder="Address" className="w-full px-3 py-2 border rounded" />
+              <button onClick={saveNewVendor} className="w-full py-2 bg-blue-600 text-white rounded">Save Vendor</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAddPurchase && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-6xl w-full max-h-screen overflow-y-auto">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h2 className="text-xl font-bold">Add Purchase</h2>
+              <button onClick={resetAddPurchase} className="text-gray-500 hover:text-gray-700">×</button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <input id="purchaseBillName" placeholder="Bill Name" className="px-3 py-2 border rounded" />
+                <input value={selectedVendor.name} readOnly placeholder="Vendor" className="px-3 py-2 border rounded bg-gray-50" />
+                <input type="datetime-local" id="purchaseDateTime" className="px-3 py-2 border rounded" defaultValue={new Date().toISOString().slice(0, 16)} />
               </div>
-              <div className="border rounded-md max-h-48 overflow-y-auto">
-                {vendorsList.length === 0 ? (
-                  <p className="p-4 text-center text-gray-500">No vendors found</p>
-                ) : (
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr><th className="px-4 py-2 text-left">Name</th><th className="px-4 py-2 text-left">Action</th></tr>
-                    </thead>
-                    <tbody>
-                      {vendorsList.map(v => (
-                        <tr key={v.id} className="border-t">
-                          <td className="px-4 py-2">{v.vendor_name}</td>
-                          <td className="px-4 py-2">
-                            <button
-                              onClick={() => {
-                                setSelectedVendor({ id: v.id, name: v.vendor_name });
-                                setShowSearchVendor(false);
-                                setShowAddPurchase(true);
-                                setPurchaseItems([]);
-                                addItemRow();
-                              }}
-                              className="text-blue-600 hover:underline"
-                            >
-                              Select
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
+
+              <table className="w-full text-sm">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="p-2">S.No</th>
+                    <th className="p-2">Product</th>
+                    <th className="p-2">Qty</th>
+                    <th className="p-2">Unit</th>
+                    <th className="p-2">Disc %</th>
+                    <th className="p-2">GST %</th>
+                    <th className="p-2">Cost</th>
+                    <th className="p-2">Sell</th>
+                    <th className="p-2">Total</th>
+                    <th className="p-2">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {purchaseItems.map((item, idx) => {
+                    const total = (item.quantity * item.per_item_cost * (1 - item.discount / 100) * (1 + item.gst / 100)).toFixed(2);
+                    return (
+                      <tr key={item.id} className="border-b">
+                        <td className="p-2 text-center">{idx + 1}</td>
+                        <td className="p-2">
+                          <AutocompleteInput
+                            value={item.product_name}
+                            onChange={(val) => updateItem(item.id, 'product_name', val, false)}
+                            onSelect={handleProductSelect}
+                            placeholder="Product"
+                            products={productsCache}
+                            itemId={item.id}
+                            isEdit={false}
+                          />
+                        </td>
+                        <td className="p-2"><input type="number" step="0.01" value={item.quantity} onChange={e => updateItem(item.id, 'quantity', parseFloat(e.target.value) || 0, false)} className="w-full px-2 py-1 border rounded" /></td>
+                        <td className="p-2">
+                          <select value={item.unit_id} onChange={e => updateItem(item.id, 'unit_id', e.target.value, false)} className="w-full px-2 py-1 border rounded">
+                            <option value="">Select</option>
+                            {item.unit_id && <option value={item.unit_id}>{item.unit_name}</option>}
+                          </select>
+                        </td>
+                        <td className="p-2"><input type="number" value={item.discount} onChange={e => updateItem(item.id, 'discount', parseFloat(e.target.value) || 0, false)} className="w-16 px-1 py-1 border rounded" /></td>
+                        <td className="p-2"><input type="number" value={item.gst} onChange={e => updateItem(item.id, 'gst', parseFloat(e.target.value) || 0, false)} className="w-16 px-1 py-1 border rounded" /></td>
+                        <td className="p-2"><input type="number" step="0.01" value={item.per_item_cost} onChange={e => updateItem(item.id, 'per_item_cost', parseFloat(e.target.value) || 0, false)} className="w-full px-2 py-1 border rounded" /></td>
+                        <td className="p-2"><input type="number" step="0.01" value={item.selling_price} onChange={e => updateItem(item.id, 'selling_price', parseFloat(e.target.value) || 0, false)} className="w-full px-2 py-1 border rounded" /></td>
+                        <td className="p-2 text-right">{total}</td>
+                        <td className="p-2 text-center">
+                          <button onClick={() => removeItem(item.id, false)} className="text-red-600 hover:text-red-800">×</button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              <div className="flex justify-end gap-2">
+                <button onClick={() => addItemRow(false)} className="px-3 py-1 border rounded text-sm">+ Add Item</button>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <input id="purchaseFinalTotal" readOnly placeholder="Final Total" className="px-3 py-2 border rounded bg-gray-50" />
+                <input id="purchaseAbsoluteDiscount" type="number" step="0.01" placeholder="Abs. Discount" className="px-3 py-2 border rounded" />
+                <input id="purchasePayableAmount" readOnly placeholder="Payable" className="px-3 py-2 border rounded bg-gray-50" />
+                <input id="purchasePaidAmount" type="number" step="0.01" placeholder="Paid" className="px-3 py-2 border rounded" />
+                <input id="purchaseDueAmount" readOnly placeholder="Due" className="px-3 py-2 border rounded bg-gray-50" />
+              </div>
+
+              <select id="purchasePaymentMode" className="w-full md:w-64 px-3 py-2 border rounded">
+                <option value="cash">Cash</option>
+                <option value="upi">UPI</option>
+                <option value="credit_card">Credit Card</option>
+                <option value="debit_card">Debit Card</option>
+                <option value="bank_transfer">Bank Transfer</option>
+                <option value="phonepe">PhonePe</option>
+              </select>
+
+              <div className="flex justify-end gap-2">
+                <button onClick={() => setShowAddPurchase(false)} className="px-4 py-2 border rounded">Cancel</button>
+                <button onClick={savePurchase} className="px-4 py-2 bg-blue-600 text-white rounded">Save Purchase</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Purchase Popup */}
+      {showEditPurchase && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-6xl w-full max-h-screen overflow-y-auto">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h2 className="text-xl font-bold">Edit Purchase</h2>
+              <button onClick={() => setShowEditPurchase(false)} className="text-gray-500 hover:text-gray-700">×</button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <input
+                  value={editForm.billName}
+                  onChange={e => setEditForm(prev => ({ ...prev, billName: e.target.value }))}
+                  placeholder="Bill Name"
+                  className="px-3 py-2 border rounded"
+                />
+                <input value={selectedVendor.name} readOnly className="px-3 py-2 border rounded bg-gray-50" />
+                <input
+                  type="datetime-local"
+                  value={editForm.dateTime}
+                  onChange={e => setEditForm(prev => ({ ...prev, dateTime: e.target.value }))}
+                  className="px-3 py-2 border rounded"
+                />
+              </div>
+
+              <table className="w-full text-sm">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="p-2">S.No</th>
+                    <th className="p-2">Product</th>
+                    <th className="p-2">Qty</th>
+                    <th className="p-2">Unit</th>
+                    <th className="p-2">Disc %</th>
+                    <th className="p-2">GST %</th>
+                    <th className="p-2">Cost</th>
+                    <th className="p-2">Sell</th>
+                    <th className="p-2">Total</th>
+                    <th className="p-2">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {editPurchaseItems.map((item, idx) => {
+                    const total = (item.quantity * item.per_item_cost * (1 - item.discount / 100) * (1 + item.gst / 100)).toFixed(2);
+                    return (
+                      <tr key={item.id} className="border-b">
+                        <td className="p-2 text-center">{idx + 1}</td>
+                        <td className="p-2">
+                          <AutocompleteInput
+                            value={item.product_name}
+                            onChange={(val) => updateItem(item.id, 'product_name', val, true)}
+                            onSelect={handleProductSelect}
+                            placeholder="Product"
+                            products={productsCache}
+                            itemId={item.id}
+                            isEdit={true}
+                          />
+                        </td>
+                        <td className="p-2"><input type="number" step="0.01" value={item.quantity} onChange={e => updateItem(item.id, 'quantity', parseFloat(e.target.value) || 0, true)} className="w-full px-2 py-1 border rounded" /></td>
+                        <td className="p-2">
+                          <select value={item.unit_id} onChange={e => updateItem(item.id, 'unit_id', e.target.value, true)} className="w-full px-2 py-1 border rounded">
+                            <option value="">Select</option>
+                            {item.unit_id && <option value={item.unit_id}>{item.unit_name}</option>}
+                          </select>
+                        </td>
+                        <td className="p-2"><input type="number" value={item.discount} onChange={e => updateItem(item.id, 'discount', parseFloat(e.target.value) || 0, true)} className="w-16 px-1 py-1 border rounded" /></td>
+                        <td className="p-2"><input type="number" value={item.gst} onChange={e => updateItem(item.id, 'gst', parseFloat(e.target.value) || 0, true)} className="w-16 px-1 py-1 border rounded" /></td>
+                        <td className="p-2"><input type="number" step="0.01" value={item.per_item_cost} onChange={e => updateItem(item.id, 'per_item_cost', parseFloat(e.target.value) || 0, true)} className="w-full px-2 py-1 border rounded" /></td>
+                        <td className="p-2"><input type="number" step="0.01" value={item.selling_price} onChange={e => updateItem(item.id, 'selling_price', parseFloat(e.target.value) || 0, true)} className="w-full px-2 py-1 border rounded" /></td>
+                        <td className="p-2 text-right">{total}</td>
+                        <td className="p-2 text-center">
+                          <button onClick={() => removeItem(item.id, true)} className="text-red-600 hover:text-red-800">×</button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              <div className="flex justify-end gap-2">
+                <button onClick={() => addItemRow(true)} className="px-3 py-1 border rounded text-sm">+ Add Item</button>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-medium">Final Total</label>
+                  <input value={editTotals.subtotal.toFixed(2)} readOnly className="w-full px-3 py-2 border rounded bg-gray-50" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium">Abs. Discount</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={editForm.absoluteDiscount}
+                    onChange={e => setEditForm(prev => ({ ...prev, absoluteDiscount: parseFloat(e.target.value) || 0 }))}
+                    className="w-full px-3 py-2 border rounded"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium">Payable</label>
+                  <input value={editTotals.payable.toFixed(2)} readOnly className="w-full px-3 py-2 border rounded bg-gray-50" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium">Paid (Original)</label>
+                  <input value={editOriginalPaidAmount.toFixed(2)} readOnly className="w-full px-3 py-2 border rounded bg-gray-50" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium">Set Paid Adj.</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={editForm.setPaidAmount}
+                    onChange={e => setEditForm(prev => ({ ...prev, setPaidAmount: parseFloat(e.target.value) || 0 }))}
+                    className="w-full px-3 py-2 border rounded"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium">Due</label>
+                  <input value={editTotals.due.toFixed(2)} readOnly className="w-full px-3 py-2 border rounded bg-gray-50" />
+                </div>
+              </div>
+
+              <select
+                value={editForm.paymentMode}
+                onChange={e => setEditForm(prev => ({ ...prev, paymentMode: e.target.value }))}
+                className="w-full md:w-64 px-3 py-2 border rounded"
+              >
+                <option value="cash">Cash</option>
+                <option value="upi">UPI</option>
+                <option value="credit_card">Credit Card</option>
+                <option value="debit_card">Debit Card</option>
+                <option value="bank_transfer">Bank Transfer</option>
+                <option value="phonepe">PhonePe</option>
+              </select>
+
+              <div className="flex justify-end gap-2">
+                <button onClick={() => setShowEditPurchase(false)} className="px-4 py-2 border rounded">Cancel</button>
+                <button onClick={saveEditedPurchase} className="px-4 py-2 bg-green-600 text-white rounded">Update Purchase</button>
               </div>
             </div>
           </div>
