@@ -1,14 +1,14 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Search,
   Edit,
   Trash2,
-  X,
   ChevronLeft,
   ChevronRight,
   Save,
+  X,
   AlertCircle,
 } from 'lucide-react';
 import Header from '../components/Header';
@@ -23,86 +23,83 @@ export default function ProductInfo() {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
   const [toasts, setToasts] = useState([]);
   const [loading, setLoading] = useState(true);
   const itemsPerPage = 50;
   const isRestricted = user && [4, 5].includes(parseInt(user.rid) || 0);
 
-  // Toast
-  const showToast = useCallback((message, isError = false) => {
+  /* ---------- Toast ---------- */
+  const showToast = useCallback((msg, isError = false) => {
     const id = Date.now();
-    setToasts((prev) => [...prev, { id, message, isError }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 3000);
+    setToasts((p) => [...p, { id, msg, isError }]);
+    setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 3000);
   }, []);
 
-  // Load from localStorage
+  /* ---------- Auth ---------- */
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    const storedToken = localStorage.getItem('authToken');
-    if (storedUser && storedToken) {
-      const parsed = JSON.parse(storedUser);
-      setUser(parsed);
-      setAuthToken(storedToken);
+    const u = localStorage.getItem('user');
+    const t = localStorage.getItem('authToken');
+    if (u && t) {
+      setUser(JSON.parse(u));
+      setAuthToken(t);
     } else {
       showToast('Please log in.', true);
       setLoading(false);
     }
   }, [showToast]);
 
-  // Fetch Units
+  /* ---------- Fetch Units ---------- */
   const fetchUnits = async () => {
     if (!user?.cid || !authToken) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/units/${user.cid}`, {
+      const r = await fetch(`${API_BASE_URL}/units/${user.cid}`, {
         headers: { Authorization: `Bearer ${authToken}` },
       });
-      if (!res.ok) throw new Error('Failed to fetch units');
-      const data = await res.json();
-      setUnitData(data.units || []);
-    } catch (err) {
-      showToast(err.message, true);
+      if (!r.ok) throw new Error('Failed to fetch units');
+      const d = await r.json();
+      setUnitData(d.units || []);
+    } catch (e) {
+      showToast(e.message, true);
     }
   };
 
-  // Fetch Stock
+  /* ---------- Fetch Stock ---------- */
   const fetchStockData = async () => {
     if (!user?.cid || !authToken) return [];
     try {
-      const res = await fetch(`${API_BASE_URL}/products/stock/${user.cid}`, {
+      const r = await fetch(`${API_BASE_URL}/products/stock/${user.cid}`, {
         headers: { Authorization: `Bearer ${authToken}` },
       });
-      if (!res.ok) throw new Error('Failed to fetch stock');
-      const data = await res.json();
-      const mapped = data.map((s) => ({
+      if (!r.ok) throw new Error('Failed to fetch stock');
+      const d = await r.json();
+      return d.map((s) => ({
         id: String(s.id),
         purchase_stock: s.purchase_stock || '0',
         sales_stock: s.sales_stock || '0',
         current_stock: s.current_stock || '0',
       }));
-      return mapped;
-    } catch (err) {
-      showToast(err.message, true);
+    } catch (e) {
+      showToast(e.message, true);
       return [];
     }
   };
 
-  // Fetch Products
+  /* ---------- Fetch Products ---------- */
   const fetchProductInfo = async () => {
     if (!user?.cid || !authToken) {
       setLoading(false);
       return;
     }
     try {
-      const res = await fetch(`${API_BASE_URL}/product-info/${user.cid}`, {
+      const r = await fetch(`${API_BASE_URL}/product-info/${user.cid}`, {
         headers: { Authorization: `Bearer ${authToken}` },
       });
-      if (!res.ok) throw new Error('Failed to fetch products');
-      const data = await res.json();
+      if (!r.ok) throw new Error('Failed to fetch products');
+      const data = await r.json();
 
       const stock = await fetchStockData();
-      await fetchUnits(); // Fetch units to populate state for EditForm
+      await fetchUnits();
 
       const list = (data || [])
         .map((p) => {
@@ -127,70 +124,80 @@ export default function ProductInfo() {
 
       setProductInfoList(list);
       setLoading(false);
-    } catch (err) {
-      showToast(err.message, true);
+    } catch (e) {
+      showToast(e.message, true);
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (user && authToken) {
-      fetchProductInfo();
-    }
+    if (user && authToken) fetchProductInfo();
   }, [user, authToken]);
 
-  // Filter & Paginate
-  const filteredProducts = productInfoList.filter(
-    (p) =>
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.hsn_code.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  /* ---------- Filter / Sort / Paginate ---------- */
+  const processedProducts = useMemo(() => {
+    let filtered = productInfoList.filter(
+      (p) =>
+        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.hsn_code.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
-  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
-  const paginated = filteredProducts.slice(
+    filtered.sort((a, b) => {
+      const sa = parseInt(a.current_stock) || 0;
+      const sb = parseInt(b.current_stock) || 0;
+      const lowA = sa <= 10;
+      const lowB = sb <= 10;
+      if (lowA && !lowB) return -1;
+      if (!lowA && lowB) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    return filtered;
+  }, [productInfoList, searchTerm]);
+
+  const totalPages = Math.ceil(processedProducts.length / itemsPerPage);
+  const paginated = processedProducts.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
 
-  // Delete
-  const deleteProduct = async (id) => {
-    if (!confirm('Are you sure you want to delete this product?')) return;
-    try {
-      const res = await fetch(`${API_BASE_URL}/product-info/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${authToken}` },
-      });
-      if (!res.ok) throw new Error('Delete failed');
-      setProductInfoList((prev) => prev.filter((p) => p.id !== id));
-      showToast('Product deleted!', false);
-    } catch (err) {
-      showToast(err.message, true);
-    }
+  /* ---------- Edit Helpers ---------- */
+  const startEdit = (p) => {
+    setEditingId(p.id);
+    setEditForm({
+      hsn_code: p.hsn_code,
+      purchase_price: p.purchase_price,
+      profit_percentage: p.profit_percentage,
+      gst: p.gst,
+      unit_name: p.unit_name,
+      description: p.description,
+    });
   };
-
-  // Update
-  const updateProduct = async (formData, id) => {
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditForm({});
+  };
+  const saveEdit = async (id) => {
     const payload = {
-      name: formData.name,
-      hsn_code: formData.hsn_code,
-      purchase_price: parseFloat(formData.purchase_price).toFixed(2),
-      profit_percentage: parseFloat(formData.profit_percentage).toFixed(2),
-      gst: parseFloat(formData.gst).toFixed(2),
-      unit_name: formData.unit_name,
-      description: formData.description,
+      hsn_code: editForm.hsn_code,
+      purchase_price: parseFloat(editForm.purchase_price).toFixed(2),
+      profit_percentage: parseFloat(editForm.profit_percentage).toFixed(2),
+      gst: parseFloat(editForm.gst).toFixed(2),
+      unit_name: editForm.unit_name,
+      description: editForm.description,
       pre_gst_sale_cost: (
-        parseFloat(formData.purchase_price) *
-        (1 + parseFloat(formData.profit_percentage) / 100)
+        parseFloat(editForm.purchase_price) *
+        (1 + parseFloat(editForm.profit_percentage) / 100)
       ).toFixed(2),
       post_gst_sale_cost: (
-        parseFloat(formData.purchase_price) *
-        (1 + parseFloat(formData.profit_percentage) / 100) *
-        (1 + parseFloat(formData.gst) / 100)
+        parseFloat(editForm.purchase_price) *
+        (1 + parseFloat(editForm.profit_percentage) / 100) *
+        (1 + parseFloat(editForm.gst) / 100)
       ).toFixed(2),
     };
 
     try {
-      const res = await fetch(`${API_BASE_URL}/product-info/${id}`, {
+      const r = await fetch(`${API_BASE_URL}/product-info/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -198,18 +205,34 @@ export default function ProductInfo() {
         },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error('Update failed');
+      if (!r.ok) throw new Error('Update failed');
       await fetchProductInfo();
-      setEditingId(null);
+      cancelEdit();
       showToast('Product updated!', false);
-    } catch (err) {
-      showToast(err.message, true);
+    } catch (e) {
+      showToast(e.message, true);
+    }
+  };
+
+  /* ---------- Delete ---------- */
+  const deleteProduct = async (id) => {
+    if (!confirm('Are you sure you want to delete this product?')) return;
+    try {
+      const r = await fetch(`${API_BASE_URL}/product-info/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      if (!r.ok) throw new Error('Delete failed');
+      setProductInfoList((prev) => prev.filter((p) => p.id !== id));
+      showToast('Product deleted!', false);
+    } catch (e) {
+      showToast(e.message, true);
     }
   };
 
   if (loading)
     return (
-      <div className="flex items-center justify-center h-screen text-lg bg-gray-50">
+      <div className="flex h-screen items-center justify-center text-lg bg-gray-50">
         Loading...
       </div>
     );
@@ -217,19 +240,19 @@ export default function ProductInfo() {
   return (
     <>
       <div className="p-6">
-        {/* Header */}
         <Header
           title="Products Info."
           bgColor="bg-gradient-to-r from-neutral-800 to-cyan-700 text-white"
         />
 
-        {/* Main Content */}
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 bg-white">
-          <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-6">
-            <h2 className=' font-bold text-lg text-cyan-950 mb-2 '>Product Information List</h2>
-            {/* Search Bar */}
-            <div className="relative max-w-md mb-6">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+        <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+          {/* Header + Search */}
+          <div className="mb-6 flex flex-col items-start md:flex-row md:items-center md:justify-between">
+            <h2 className="mb-2 text-lg font-bold text-cyan-950">
+              Product Information List
+            </h2>
+            <div className="relative w-full max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
                 type="text"
                 placeholder="Search products..."
@@ -238,58 +261,58 @@ export default function ProductInfo() {
                   setSearchTerm(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-700"
+                className="w-full rounded-lg border pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-700"
               />
             </div>
           </div>
 
-          {/* Table View - Large Screens */}
-          <div className="hidden lg:block bg-white rounded-lg shadow overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
+          {/* ------------------- Desktop Table (Fixed Width) ------------------- */}
+          <div className="hidden overflow-x-auto rounded-lg bg-white shadow lg:block">
+            <table className="min-w-full table-fixed divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase">
+                  <th className="w-12 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
                     S.No
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase">
+                  <th className="w-48 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
                     Product
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase">
+                  <th className="w-20 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
                     Unit
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase">
+                  <th className="w-24 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
                     HSN
                   </th>
                   {!isRestricted && (
                     <>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase">
+                      <th className="w-24 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
                         Purchase
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase">
+                      <th className="w-20 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
                         Profit
                       </th>
                     </>
                   )}
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase">
+                  <th className="w-40 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
                     Costs
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase">
+                  <th className="w-40 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
                     Stocks
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase">
+                  <th className="w-48 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
                     Desc
                   </th>
                   {!isRestricted && (
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase">
+                    <th className="w-24 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
                       Action
                     </th>
                   )}
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="divide-y divide-gray-200 bg-white">
                 {paginated.length === 0 ? (
                   <tr>
-                    <td colSpan="10" className="text-center py-8 text-gray-500">
+                    <td colSpan="10" className="py-8 text-center text-gray-500">
                       No products found
                     </td>
                   </tr>
@@ -297,72 +320,184 @@ export default function ProductInfo() {
                   paginated.map((p, i) => {
                     const idx = (currentPage - 1) * itemsPerPage + i + 1;
                     const isEditing = editingId === p.id;
+                    const lowStock = (parseInt(p.current_stock) || 0) <= 10;
+
                     return (
-                      <React.Fragment key={p.id}>
-                        <tr>
-                          <td className="px-6 py-4 text-sm">{idx}</td>
-                          <td className="px-6 py-4 text-sm font-medium">
-                            {p.name}
-                          </td>
-                          <td className="px-6 py-4 text-sm">{p.unit_name}</td>
-                          <td className="px-6 py-4 text-sm">{p.hsn_code}</td>
-                          {!isRestricted && (
-                            <>
-                              <td className="px-6 py-4 text-sm">
-                                ₹{p.purchase_price.toFixed(2)}
-                              </td>
-                              <td className="px-6 py-4 text-sm">
-                                {p.profit_percentage.toFixed(2)}%
-                              </td>
-                            </>
+                      <tr
+                        key={p.id}
+                        className={`${lowStock ? 'bg-red-50' : ''} ${
+                          isEditing ? 'bg-yellow-50' : ''
+                        }`}
+                      >
+                        <td
+                          className={`px-6 py-4 text-sm ${
+                            lowStock ? 'font-semibold text-red-700' : ''
+                          }`}
+                        >
+                          {idx}
+                        </td>
+
+                        <td
+                          className={`px-6 py-4 text-sm font-medium ${
+                            lowStock ? 'text-red-700' : ''
+                          }`}
+                        >
+                          {p.name}
+                        </td>
+
+                        {/* Unit */}
+                        <td className={`px-6 py-4 text-sm ${lowStock ? 'text-red-700' : ''}`}>
+                          {isEditing ? (
+                            <select
+                              value={editForm.unit_name || ''}
+                              onChange={(e) =>
+                                setEditForm({ ...editForm, unit_name: e.target.value })
+                              }
+                              className="w-full rounded border px-2 py-1 text-sm"
+                            >
+                              <option value="">Select Unit</option>
+                              {unitData.map((u) => (
+                                <option key={u.name} value={u.name}>
+                                  {u.name}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            p.unit_name
                           )}
-                          <td className="px-6 py-4 text-sm text-gray-600">
-                            <div>
-                              Pre-GST: ₹{p.pre_gst_sale_cost.toFixed(2)}
-                            </div>
-                            <div>GST: {p.gst.toFixed(2)}%</div>
-                            <div>
-                              Post-GST: ₹{p.post_gst_sale_cost.toFixed(2)}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-600">
-                            <div>P: {p.purchase_stock}</div>
-                            <div>S: {p.sales_stock}</div>
-                            <div>C: {p.current_stock}</div>
-                          </td>
-                          <td className="px-6 py-4 text-sm max-w-xs truncate">
-                            {p.description}
-                          </td>
-                          {!isRestricted && (
-                            <td className="px-6 py-4 text-sm">
-                              <button
-                                onClick={() => setEditingId(p.id)}
-                                className="text-cyan-700 hover:text-blue-800 mr-3"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => deleteProduct(p.id)}
-                                className="text-red-600 hover:text-red-800"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </td>
+                        </td>
+
+                        {/* HSN */}
+                        <td className={`px-6 py-4 text-sm ${lowStock ? 'text-red-700' : ''}`}>
+                          {isEditing ? (
+                            <input
+                              type="text"
+                              value={editForm.hsn_code || ''}
+                              onChange={(e) =>
+                                setEditForm({ ...editForm, hsn_code: e.target.value })
+                              }
+                              className="w-full rounded border px-2 py-1 text-sm"
+                            />
+                          ) : (
+                            p.hsn_code
                           )}
-                        </tr>
-                        {isEditing && (
-                          <tr>
-                            <td colSpan="10" className="p-6 bg-gray-50">
-                              <EditForm
-                                product={p}
-                                units={unitData}
-                                onSave={(data) => updateProduct(data, p.id)}
-                                onCancel={() => setEditingId(null)}
-                              />
+                        </td>
+
+                        {/* Purchase / Profit */}
+                        {!isRestricted && (
+                          <>
+                            <td className={`px-6 py-4 text-sm ${lowStock ? 'text-red-700' : ''}`}>
+                              {isEditing ? (
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={editForm.purchase_price || ''}
+                                  onChange={(e) =>
+                                    setEditForm({
+                                      ...editForm,
+                                      purchase_price: e.target.value,
+                                    })
+                                  }
+                                  className="w-full rounded border px-2 py-1 text-sm"
+                                />
+                              ) : (
+                                `₹${p.purchase_price.toFixed(2)}`
+                              )}
                             </td>
-                          </tr>
+                            <td className={`px-6 py-4 text-sm ${lowStock ? 'text-red-700' : ''}`}>
+                              {isEditing ? (
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={editForm.profit_percentage || ''}
+                                  onChange={(e) =>
+                                    setEditForm({
+                                      ...editForm,
+                                      profit_percentage: e.target.value,
+                                    })
+                                  }
+                                  className="w-full rounded border px-2 py-1 text-sm"
+                                />
+                              ) : (
+                                `${p.profit_percentage.toFixed(2)}%`
+                              )}
+                            </td>
+                          </>
                         )}
-                      </React.Fragment>
+
+                        {/* Costs */}
+                        <td className={`px-6 py-4 text-sm ${lowStock ? 'text-red-700' : ''}`}>
+                          <div>Pre-GST: ₹{p.pre_gst_sale_cost.toFixed(2)}</div>
+                          <div>GST: {p.gst.toFixed(2)}%</div>
+                          <div>Post-GST: ₹{p.post_gst_sale_cost.toFixed(2)}</div>
+                        </td>
+
+                        {/* Stocks */}
+                        <td
+                          className={`px-6 py-4 text-sm font-semibold ${
+                            lowStock ? 'text-red-800' : 'text-gray-600'
+                          }`}
+                        >
+                          <div>Purchase: {p.purchase_stock}</div>
+                          <div>Sales: {p.sales_stock}</div>
+                          <div className={lowStock ? 'text-red-600' : ''}>
+                            Current: {p.current_stock}
+                          </div>
+                        </td>
+
+                        {/* Description */}
+                        <td className={`px-6 py-4 text-sm ${lowStock ? 'text-red-700' : ''}`}>
+                          {isEditing ? (
+                            <textarea
+                              value={editForm.description || ''}
+                              onChange={(e) =>
+                                setEditForm({ ...editForm, description: e.target.value })
+                              }
+                              className="w-full rounded border px-2 py-1 text-sm"
+                              rows={2}
+                            />
+                          ) : (
+                            <div className="truncate">{p.description}</div>
+                          )}
+                        </td>
+
+                        {/* Action */}
+                        {!isRestricted && (
+                          <td className="px-6 py-4 text-sm">
+                            {isEditing ? (
+                              <div className="flex gap-1">
+                                <button
+                                  onClick={() => saveEdit(p.id)}
+                                  className="text-green-600 hover:text-green-800"
+                                >
+                                  <Save className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={cancelEdit}
+                                  className="text-gray-600 hover:text-gray-800"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => startEdit(p)}
+                                  className="text-cyan-700 hover:text-blue-800"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={() => deleteProduct(p.id)}
+                                  className="text-red-600 hover:text-red-800"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        )}
+                      </tr>
                     );
                   })
                 )}
@@ -370,138 +505,248 @@ export default function ProductInfo() {
             </table>
           </div>
 
-          {/* Pagination - Desktop */}
-          <div className="hidden lg:flex justify-between items-center mt-6">
+          {/* ------------------- Mobile Card View ------------------- */}
+          <div className="space-y-4 lg:hidden">
+            {paginated.map((p, i) => {
+              const idx = (currentPage - 1) * itemsPerPage + i + 1;
+              const isEditing = editingId === p.id;
+              const lowStock = (parseInt(p.current_stock) || 0) <= 10;
+
+              return (
+                <div
+                  key={p.id}
+                  className={`rounded-lg bg-white p-4 shadow ${
+                    lowStock ? 'border-2 border-red-400' : ''
+                  } ${isEditing ? 'ring-2 ring-yellow-400' : ''}`}
+                >
+                  <div className="mb-3 flex items-start justify-between">
+                    <h3
+                      className={`text-lg font-semibold ${lowStock ? 'text-red-700' : ''}`}
+                    >
+                      {idx}. {p.name}
+                    </h3>
+                    {!isRestricted && (
+                      <div className="flex gap-2">
+                        {isEditing ? (
+                          <>
+                            <button
+                              onClick={() => saveEdit(p.id)}
+                              className="text-green-600"
+                            >
+                              <Save className="h-5 w-5" />
+                            </button>
+                            <button onClick={cancelEdit} className="text-gray-600">
+                              <X className="h-5 w-5" />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => startEdit(p)}
+                              className="text-cyan-700"
+                            >
+                              <Edit className="h-5 w-5" />
+                            </button>
+                            <button
+                              onClick={() => deleteProduct(p.id)}
+                              className="text-red-600"
+                            >
+                              <Trash2 className="h-5 w-5" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-3 text-sm">
+                    <div>
+                      <strong>Unit:</strong>{' '}
+                      {isEditing ? (
+                        <select
+                          value={editForm.unit_name || ''}
+                          onChange={(e) =>
+                            setEditForm({ ...editForm, unit_name: e.target.value })
+                          }
+                          className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                        >
+                          <option value="">Select Unit</option>
+                          {unitData.map((u) => (
+                            <option key={u.name} value={u.name}>
+                              {u.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        p.unit_name
+                      )}
+                    </div>
+
+                    <div>
+                      <strong>HSN:</strong>{' '}
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editForm.hsn_code || ''}
+                          onChange={(e) =>
+                            setEditForm({ ...editForm, hsn_code: e.target.value })
+                          }
+                          className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                        />
+                      ) : (
+                        p.hsn_code
+                      )}
+                    </div>
+
+                    {!isRestricted && (
+                      <>
+                        <div>
+                          <strong>Purchase:</strong>{' '}
+                          {isEditing ? (
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={editForm.purchase_price || ''}
+                              onChange={(e) =>
+                                setEditForm({
+                                  ...editForm,
+                                  purchase_price: e.target.value,
+                                })
+                              }
+                              className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                            />
+                          ) : (
+                            `₹${p.purchase_price.toFixed(2)}`
+                          )}
+                        </div>
+                        <div>
+                          <strong>Profit:</strong>{' '}
+                          {isEditing ? (
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={editForm.profit_percentage || ''}
+                              onChange={(e) =>
+                                setEditForm({
+                                  ...editForm,
+                                  profit_percentage: e.target.value,
+                                })
+                              }
+                              className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                            />
+                          ) : (
+                            `${p.profit_percentage.toFixed(2)}%`
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    <div className={lowStock ? 'text-red-700' : ''}>
+                      <strong>Costs:</strong>
+                      <br />
+                      Pre: ₹{p.pre_gst_sale_cost.toFixed(2)} | GST: {p.gst}% | Post: ₹
+                      {p.post_gst_sale_cost.toFixed(2)}
+                    </div>
+
+                    <div className="font-semibold">
+                      <strong>Stocks:</strong>{' '}
+                      <span className={lowStock ? 'text-red-600' : ''}>
+                        Purchase:{p.purchase_stock} Sales:{p.sales_stock} Current:{p.current_stock}
+                      </span>
+                    </div>
+
+                    <div>
+                      <strong>Description:</strong>{' '}
+                      {isEditing ? (
+                        <textarea
+                          value={editForm.description || ''}
+                          onChange={(e) =>
+                            setEditForm({ ...editForm, description: e.target.value })
+                          }
+                          className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                          rows={2}
+                        />
+                      ) : (
+                        <span className="text-xs text-gray-500">{p.description}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {isEditing && (
+                    <div className="mt-4 flex justify-end gap-2 border-t pt-2">
+                      <button
+                        onClick={() => saveEdit(p.id)}
+                        className="rounded bg-green-600 px-3 py-1 text-sm text-white"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={cancelEdit}
+                        className="rounded border px-3 py-1 text-sm"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Pagination – Desktop */}
+          <div className="mt-6 hidden items-center justify-between lg:flex">
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="flex items-center gap-2 px-4 py-2 border rounded-lg disabled:opacity-50"
+              className="flex items-center gap-2 rounded-lg border px-4 py-2 disabled:opacity-50"
             >
-              <ChevronLeft className="w-4 h-4" /> Prev
+              <ChevronLeft className="h-4 w-4" /> Prev
             </button>
             <span className="text-sm text-gray-600">
-              Page {currentPage} of {totalPages} ({filteredProducts.length} total)
+              Page {currentPage} of {totalPages} ({processedProducts.length} total)
             </span>
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className="flex items-center gap-2 px-4 py-2 border rounded-lg disabled:opacity-50"
+              className="flex items-center gap-2 rounded-lg border px-4 py-2 disabled:opacity-50"
             >
-              Next <ChevronRight className="w-4 h-4" />
+              Next <ChevronRight className="h-4 w-4" />
             </button>
           </div>
 
-          {/* Card View - Mobile */}
-          <div className="lg:hidden space-y-4">
-            {paginated.length === 0 ? (
-              <div className="text-center py-10 text-gray-500">
-                No products found
-              </div>
-            ) : (
-              paginated.map((p, i) => {
-                const idx = (currentPage - 1) * itemsPerPage + i + 1;
-                const isEditing = editingId === p.id;
-                return (
-                  <div key={p.id} className="bg-white rounded-lg shadow p-4">
-                    <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-semibold text-lg">
-                        {idx}. {p.name}
-                      </h3>
-                      {!isRestricted && (
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => setEditingId(p.id)}
-                            className="text-cyan-700"
-                          >
-                            <Edit className="w-5 h-5" />
-                          </button>
-                          <button
-                            onClick={() => deleteProduct(p.id)}
-                            className="text-red-600"
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
-                      <div>
-                        <strong>Unit:</strong> {p.unit_name}
-                      </div>
-                      <div>
-                        <strong>HSN:</strong> {p.hsn_code}
-                      </div>
-                      {!isRestricted && (
-                        <>
-                          <div>
-                            <strong>Purchase:</strong> ₹{p.purchase_price.toFixed(2)}
-                          </div>
-                          <div>
-                            <strong>Profit:</strong> {p.profit_percentage.toFixed(2)}%
-                          </div>
-                        </>
-                      )}
-                      <div className="col-span-2">
-                        <strong>Costs:</strong>
-                        <br />
-                        Pre: ₹{p.pre_gst_sale_cost.toFixed(2)} | GST: {p.gst}% | Post: ₹{p.post_gst_sale_cost.toFixed(2)}
-                      </div>
-                      <div className="col-span-2">
-                        <strong>Stocks:</strong> P:{p.purchase_stock} S:{p.sales_stock} C:{p.current_stock}
-                      </div>
-                      <div className="col-span-2 text-xs text-gray-500 mt-2">
-                        {p.description}
-                      </div>
-                    </div>
-                    {isEditing && (
-                      <div className="mt-4 pt-4 border-t">
-                        <EditForm
-                          product={p}
-                          units={unitData}
-                          onSave={(data) => updateProduct(data, p.id)}
-                          onCancel={() => setEditingId(null)}
-                        />
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </div>
-
-          {/* Mobile Pagination */}
-          <div className="lg:hidden flex justify-center gap-4 mt-6">
+          {/* Pagination – Mobile */}
+          <div className="mt-6 flex justify-center gap-4 lg:hidden">
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="px-4 py-2 border rounded-lg disabled:opacity-50"
+              className="rounded-lg border px-4 py-2 disabled:opacity-50"
             >
               Prev
             </button>
-            <span className="text-sm self-center">
+            <span className="self-center text-sm">
               {currentPage} / {totalPages}
             </span>
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className="px-4 py-2 border rounded-lg disabled:opacity-50"
+              className="rounded-lg border px-4 py-2 disabled:opacity-50"
             >
               Next
             </button>
           </div>
         </main>
 
-        {/* Toast Container */}
-        <div className="fixed bottom-4 right-4 space-y-2 z-50">
+        {/* Toast */}
+        <div className="fixed bottom-4 right-4 z-50 space-y-2">
           {toasts.map((t) => (
             <div
               key={t.id}
-              className={`flex items-center gap-2 px-4 py-3 rounded-lg text-white shadow-lg animate-slide-in ${
+              className={`flex items-center gap-2 rounded-lg px-4 py-3 text-white shadow-lg animate-slide-in ${
                 t.isError ? 'bg-red-600' : 'bg-green-600'
               }`}
             >
-              <AlertCircle className="w-5 h-5" />
-              <span>{t.message}</span>
+              <AlertCircle className="h-5 w-5" />
+              <span>{t.msg}</span>
             </div>
           ))}
         </div>
@@ -523,90 +768,5 @@ export default function ProductInfo() {
         }
       `}</style>
     </>
-  );
-}
-
-// Edit Form Component
-function EditForm({ product, units, onSave, onCancel }) {
-  const [form, setForm] = useState({
-    name: product.name,
-    hsn_code: product.hsn_code,
-    purchase_price: product.purchase_price,
-    profit_percentage: product.profit_percentage,
-    gst: product.gst,
-    unit_name: product.unit_name,
-    description: product.description,
-  });
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-      <input
-        type="text"
-        value={form.name}
-        readOnly
-        className="border rounded px-3 py-2 bg-gray-100"
-      />
-      <input
-        type="text"
-        placeholder="HSN Code"
-        value={form.hsn_code}
-        onChange={(e) => setForm({ ...form, hsn_code: e.target.value })}
-        className="border rounded px-3 py-2"
-      />
-      <input
-        type="number"
-        step="0.01"
-        placeholder="Purchase Price"
-        value={form.purchase_price}
-        onChange={(e) => setForm({ ...form, purchase_price: e.target.value })}
-        className="border rounded px-3 py-2"
-      />
-      <input
-        type="number"
-        step="0.01"
-        placeholder="Profit %"
-        value={form.profit_percentage}
-        onChange={(e) => setForm({ ...form, profit_percentage: e.target.value })}
-        className="border rounded px-3 py-2"
-      />
-      <input
-        type="number"
-        step="0.01"
-        placeholder="GST %"
-        value={form.gst}
-        onChange={(e) => setForm({ ...form, gst: e.target.value })}
-        className="border rounded px-3 py-2"
-      />
-      <select
-        value={form.unit_name}
-        onChange={(e) => setForm({ ...form, unit_name: e.target.value })}
-        className="border rounded px-3 py-2"
-      >
-        <option value="">Select Unit</option>
-        {units.map((u) => (
-          <option key={u.name} value={u.name}>
-            {u.name}
-          </option>
-        ))}
-      </select>
-      <textarea
-        placeholder="Description"
-        value={form.description}
-        onChange={(e) => setForm({ ...form, description: e.target.value })}
-        className="border rounded px-3 py-2 md:col-span-2 lg:col-span-3"
-        rows="2"
-      />
-      <div className="md:col-span-2 lg:col-span-3 flex gap-2">
-        <button onClick={onCancel} className="px-4 py-2 border rounded-lg">
-          Cancel
-        </button>
-        <button
-          onClick={() => onSave(form)}
-          className="px-4 py-2 bg-cyan-700 text-white rounded-lg"
-        >
-          Update
-        </button>
-      </div>
-    </div>
   );
 }
