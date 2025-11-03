@@ -1,9 +1,9 @@
-'use client';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Search, Plus, Download, Edit, Trash2, ChevronLeft, ChevronRight,
-  X, Save, RotateCcw, Calculator
+  X, Save, RotateCcw, Calculator, User
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom'; // React Router navigation
 
 const API_BASE_URL = "http://127.0.0.1:8000/api";
 
@@ -105,6 +105,7 @@ const calculateRowTotal = (item) => {
 };
 
 const Purchase = () => {
+  const navigate = useNavigate(); // Navigation hook
   const [user, setUser] = useState({});
   const [userName, setUserName] = useState('Loading...');
   const [vendorsList, setVendorsList] = useState([]);
@@ -687,14 +688,19 @@ const Purchase = () => {
   /* ------------------------------------------------------------------ */
   return (
     <>
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
+      {/* Simple Navbar – No Effects */}
+      <div className="bg-gradient-to-r from-neutral-800 to-cyan-700 text-white">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-gray-800">Purchase</h2>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gray-300 rounded-full"></div>
-            <span className="text-gray-700">{userName}</span>
-          </div>
+          <h2 className="text-2xl font-bold">Purchase</h2>
+          <button
+            onClick={() => navigate('/profile')}
+            className="flex items-center gap-2 hover:bg-white/10 px-3 py-1.5 rounded-full transition-colors"
+          >
+            <div className="w-9 h-9 bg-white rounded-full flex items-center justify-center shadow-md">
+              <User className="w-5 h-5 text-gray-800" />
+            </div>
+            <span className="font-medium">{userName}</span>
+          </button>
         </div>
       </div>
 
@@ -709,7 +715,7 @@ const Purchase = () => {
                   placeholder="Search purchases..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 border rounded-md w-full md:w-64 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="pl-10 pr-4 py-2 border rounded-md w-full md:w-64 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                 />
                 <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
               </div>
@@ -721,16 +727,17 @@ const Purchase = () => {
                   addItemRow(false);
                   await fetchProducts();
                 }}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center gap-2"
+                className="bg-cyan-600 text-white px-4 py-2 rounded-md hover:bg-cyan-700 flex items-center gap-2"
               >
                 <Plus className="w-5 h-5" /> Purchase Bill
               </button>
             </div>
           </div>
 
-          {/* Table */}
+          {/* Responsive Table / Cards */}
           <div className="overflow-x-auto">
-            <table className="w-full">
+            {/* Desktop: Table */}
+            <table className="w-full hidden md:table">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">S.No</th>
@@ -751,7 +758,7 @@ const Purchase = () => {
 
                   return (
                     <React.Fragment key={tid}>
-                      <tr>
+                      <tr key={`main-row-${tid}`}>
                         <td className="px-4 py-3 text-sm">{(currentPage - 1) * itemsPerPage + idx + 1}</td>
                         <td className="px-4 py-3 text-sm">{p.bill_name || 'N/A'}</td>
                         <td className="px-4 py-3 text-sm">{p.vendor_name}</td>
@@ -759,7 +766,7 @@ const Purchase = () => {
                         <td className="px-4 py-3 text-sm">{p.date}</td>
                         <td className="px-4 py-3 text-sm">{p.purchased_by || 'Unknown'}</td>
                         <td className="px-4 py-3 text-sm flex gap-2">
-                          <button onClick={() => toggleDetails(tid)} className="text-blue-600 hover:underline">
+                          <button onClick={() => toggleDetails(tid)} className="text-cyan-600 hover:underline">
                             {isOpen ? 'Hide' : 'View'}
                           </button>
                           <button onClick={() => openEdit(p.transaction_id)} className="text-green-600 hover:underline">Edit</button>
@@ -767,55 +774,51 @@ const Purchase = () => {
                         </td>
                       </tr>
 
-                      {isOpen && (
-                        <tr>
+                      {isOpen && details && (
+                        <tr key={`details-row-${tid}`}>
                           <td colSpan={7} className="px-4 py-3 bg-gray-50">
-                            {details ? (
-                              <div className="text-xs">
-                                <div className="grid grid-cols-3 gap-2 mb-3">
-                                  <span><strong>Bill:</strong> {details.bill_name}</span>
-                                  <span><strong>ID:</strong> {p.transaction_id}</span>
-                                  <span><strong>Date:</strong> {p.date}</span>
-                                </div>
-                                <hr className="my-2" />
-                                <h4 className="font-medium mb-1">Items</h4>
-                                <table className="min-w-full text-xs">
-                                  <thead>
-                                    <tr className="bg-gray-100">
-                                      <th className="px-2 py-1 text-left">Product</th>
-                                      <th className="px-2 py-1 text-left">Qty</th>
-                                      <th className="px-2 py-1 text-left">Unit</th>
-                                      <th className="px-2 py-1 text-left">Disc</th>
-                                      <th className="px-2 py-1 text-left">GST</th>
-                                      <th className="px-2 py-1 text-left">Cost</th>
-                                      <th className="px-2 py-1 text-left">Total</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {details.products.map(prod => (
-                                      <tr key={prod.id}>
-                                        <td className="px-2 py-1">{prod.product_name}</td>
-                                        <td className="px-2 py-1">{prod.quantity}</td>
-                                        <td className="px-2 py-1">{prod.unit_name}</td>
-                                        <td className="px-2 py-1">{prod.discount}</td>
-                                        <td className="px-2 py-1">{prod.gst}</td>
-                                        <td className="px-2 py-1">{currency}{parseFloat(prod.per_item_cost).toFixed(2)}</td>
-                                        <td className="px-2 py-1">{currency}{parseFloat(prod.per_product_total).toFixed(2)}</td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                  <tfoot className="bg-gray-50">
-                                    <tr><td colSpan={6} className="text-right font-medium">Total:</td><td>{currency}{parseFloat(details.total_amount).toFixed(2)}</td></tr>
-                                    <tr><td colSpan={6} className="text-right font-medium">Discount:</td><td>{currency}{parseFloat(details.absolute_discount).toFixed(2)}</td></tr>
-                                    <tr><td colSpan={6} className="text-right font-medium">Payable:</td><td>{currency}{parseFloat(details.payable_amount).toFixed(2)}</td></tr>
-                                    <tr><td colSpan={6} className="text-right font-medium">Paid:</td><td>{currency}{parseFloat(details.paid_amount).toFixed(2)}</td></tr>
-                                    <tr><td colSpan={6} className="text-right font-medium">Due:</td><td>{currency}{parseFloat(details.due_amount).toFixed(2)}</td></tr>
-                                  </tfoot>
-                                </table>
+                            <div className="text-xs">
+                              <div className="grid grid-cols-3 gap-2 mb-3">
+                                <span><strong>Bill:</strong> {details.bill_name}</span>
+                                <span><strong>ID:</strong> {p.transaction_id}</span>
+                                <span><strong>Date:</strong> {p.date}</span>
                               </div>
-                            ) : (
-                              <div className="text-center py-2 text-gray-500">Loading...</div>
-                            )}
+                              <hr className="my-2" />
+                              <h4 className="font-medium mb-1">Items</h4>
+                              <table className="min-w-full text-xs">
+                                <thead>
+                                  <tr className="bg-gray-100">
+                                    <th className="px-2 py-1 text-left">Product</th>
+                                    <th className="px-2 py-1 text-left">Qty</th>
+                                    <th className="px-2 py-1 text-left">Unit</th>
+                                    <th className="px-2 py-1 text-left">Disc</th>
+                                    <th className="px-2 py-1 text-left">GST</th>
+                                    <th className="px-2 py-1 text-left">Cost</th>
+                                    <th className="px-2 py-1 text-left">Total</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {details.products.map((prod, i) => (
+                                    <tr key={prod.id || `desktop-prod-${tid}-${i}`}>
+                                      <td className="px-2 py-1">{prod.product_name}</td>
+                                      <td className="px-2 py-1">{prod.quantity}</td>
+                                      <td className="px-2 py-1">{prod.unit_name}</td>
+                                      <td className="px-2 py-1">{prod.discount}</td>
+                                      <td className="px-2 py-1">{prod.gst}</td>
+                                      <td className="px-2 py-1">{currency}{parseFloat(prod.per_item_cost).toFixed(2)}</td>
+                                      <td className="px-2 py-1">{currency}{parseFloat(prod.per_product_total).toFixed(2)}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                                <tfoot className="bg-gray-50">
+                                  <tr><td colSpan={6} className="text-right font-medium">Total:</td><td>{currency}{parseFloat(details.total_amount).toFixed(2)}</td></tr>
+                                  <tr><td colSpan={6} className="text-right font-medium">Discount:</td><td>{currency}{parseFloat(details.absolute_discount).toFixed(2)}</td></tr>
+                                  <tr><td colSpan={6} className="text-right font-medium">Payable:</td><td>{currency}{parseFloat(details.payable_amount).toFixed(2)}</td></tr>
+                                  <tr><td colSpan={6} className="text-right font-medium">Paid:</td><td>{currency}{parseFloat(details.paid_amount).toFixed(2)}</td></tr>
+                                  <tr><td colSpan={6} className="text-right font-medium">Due:</td><td>{currency}{parseFloat(details.due_amount).toFixed(2)}</td></tr>
+                                </tfoot>
+                              </table>
+                            </div>
                           </td>
                         </tr>
                       )}
@@ -824,18 +827,85 @@ const Purchase = () => {
                 })}
               </tbody>
             </table>
+
+            {/* Mobile: Cards */}
+            <div className="md:hidden p-4 space-y-4">
+              {paginated.map((p, idx) => {
+                const tid = p.transaction_id.toString();
+                const isOpen = openDetails[tid];
+                const details = detailsCache[tid];
+                const currency = getCurrencySymbol();
+
+                return (
+                  <div key={`mobile-card-${tid}`} className="border rounded-lg p-4 bg-white shadow-sm">
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div><strong>S.No:</strong></div>
+                      <div>{(currentPage - 1) * itemsPerPage + idx + 1}</div>
+                      <div><strong>Bill:</strong></div>
+                      <div>{p.bill_name || 'N/A'}</div>
+                      <div><strong>Vendor:</strong></div>
+                      <div>{p.vendor_name}</div>
+                      <div><strong>Payment:</strong></div>
+                      <div>{reversePaymentModeMap[p.payment_mode] || p.payment_mode}</div>
+                      <div><strong>Date:</strong></div>
+                      <div>{p.date}</div>
+                      <div><strong>By:</strong></div>
+                      <div>{p.purchased_by || 'Unknown'}</div>
+                    </div>
+
+                    <div className="mt-3 flex gap-2 justify-end text-xs">
+                      <button onClick={() => toggleDetails(tid)} className="text-cyan-600 hover:underline">
+                        {isOpen ? 'Hide' : 'View'} Details
+                      </button>
+                      <button onClick={() => openEdit(p.transaction_id)} className="text-green-600 hover:underline">Edit</button>
+                      <button onClick={() => deletePurchase(p.transaction_id)} className="text-red-600 hover:underline">Delete</button>
+                    </div>
+
+                    {isOpen && details && (
+                      <div className="mt-4 border-t pt-3 text-xs">
+                        <div className="grid grid-cols-2 gap-2 mb-3">
+                          <span><strong>ID:</strong> {p.transaction_id}</span>
+                          <span><strong>Date:</strong> {p.date}</span>
+                        </div>
+                        <h4 className="font-medium mb-1">Items</h4>
+                        <div className="space-y-2">
+                          {details.products.map((prod, i) => (
+                            <div key={prod.id || `mobile-prod-${tid}-${i}`} className="border-b pb-1">
+                              <div><strong>{prod.product_name}</strong></div>
+                              <div className="grid grid-cols-3 gap-1 text-xs">
+                                <span>Qty: {prod.quantity}</span>
+                                <span>Unit: {prod.unit_name}</span>
+                                <span>Disc: {prod.discount}%</span>
+                                <span>GST: {prod.gst}%</span>
+                                <span>Cost: {currency}{parseFloat(prod.per_item_cost).toFixed(2)}</span>
+                                <span>Total: {currency}{parseFloat(prod.per_product_total).toFixed(2)}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-3 space-y-1 text-xs font-medium">
+                          <div>Total: {currency}{parseFloat(details.total_amount).toFixed(2)}</div>
+                          <div>Discount: {currency}{parseFloat(details.absolute_discount).toFixed(2)}</div>
+                          <div>Payable: {currency}{parseFloat(details.payable_amount).toFixed(2)}</div>
+                          <div>Paid: {currency}{parseFloat(details.paid_amount).toFixed(2)}</div>
+                          <div>Due: {currency}{parseFloat(details.due_amount).toFixed(2)}</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {/* Pagination */}
           <div className="p-4 flex justify-between items-center border-t">
             <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="px-3 py-1 rounded border disabled:opacity-50"><ChevronLeft /></button>
-            <div>Page {currentPage} of {totalPages}</div>
+            <div className="text-sm">Page {currentPage} of {totalPages}</div>
             <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="px-3 py-1 rounded border disabled:opacity-50"><ChevronRight /></button>
           </div>
         </div>
       </div>
-
-      {/* ====================== MODALS ====================== */}
 
       {/* Vendor Search Modal */}
       {showSearchVendor && (
@@ -854,47 +924,50 @@ const Purchase = () => {
                 <input id="vendorEmailSearch" placeholder="Email" className="px-3 py-2 border rounded col-span-2" onInput={searchVendors} />
               </div>
               <div className="flex gap-2 mb-4">
-                <button onClick={() => setShowAddVendor(true)} className="px-4 py-2 bg-blue-600 text-white rounded">Add Vendor</button>
+                <button onClick={() => setShowAddVendor(true)} className="px-4 py-2 bg-cyan-600 text-white rounded">Add Vendor</button>
                 <button onClick={searchVendors} className="px-4 py-2 border rounded">Search</button>
               </div>
-              <table className="w-full text-sm">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="p-2 text-left">Name</th>
-                    <th className="p-2 text-left">PAN</th>
-                    <th className="p-2 text-left">GST</th>
-                    <th className="p-2 text-left">Phone</th>
-                    <th className="p-2 text-left">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {vendorSearchResults.length > 0 ? vendorSearchResults.map(v => (
-                    <tr key={v.id} className="border-b">
-                      <td className="p-2">{v.vendor_name}</td>
-                      <td className="p-2">{v.pan}</td>
-                      <td className="p-2">{v.gst_no}</td>
-                      <td className="p-2">{v.phone}</td>
-                      <td className="p-2">
-                        <button
-                          onClick={async () => {
-                            setSelectedVendor({ id: v.id, name: v.vendor_name });
-                            setShowSearchVendor(false);
-                            setShowAddPurchase(true);
-                            setPurchaseItems([]);
-                            addItemRow(false);
-                            await fetchProducts();
-                          }}
-                          className="text-blue-600 hover:underline"
-                        >
-                          Select
-                        </button>
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="p-2 text-left">Name</th>
+                      <th className="p-2 text-left">PAN</th>
+                      <th className="p-2 text-left">GST</th>
+                      <th className="p-2 text-left">Phone</th>
+                      <th className="p-2 text-left">Action</th>
                     </tr>
-                  )) : (
-                    <tr><td colSpan={5} className="p-4 text-center text-gray-500">No vendors found</td></tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {vendorSearchResults.map(v => (
+                      <tr key={`vendor-${v.id}`} className="border-b">
+                        <td className="p-2">{v.vendor_name}</td>
+                        <td className="p-2">{v.pan}</td>
+                        <td className="p-2">{v.gst_no}</td>
+                        <td className="p-2">{v.phone}</td>
+                        <td className="p-2">
+                          <button
+                            onClick={async () => {
+                              setSelectedVendor({ id: v.id, name: v.vendor_name });
+                              setShowSearchVendor(false);
+                              setShowAddPurchase(true);
+                              setPurchaseItems([]);
+                              addItemRow(false);
+                              await fetchProducts();
+                            }}
+                            className="text-cyan-600 hover:underline"
+                          >
+                            Select
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {vendorSearchResults.length === 0 && (
+                      <tr><td colSpan={5} className="p-4 text-center text-gray-500">No vendors found</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
@@ -916,7 +989,7 @@ const Purchase = () => {
               <input id="addVendorPhone" placeholder="Phone" className="w-full px-3 py-2 border rounded" />
               <input id="addVendorEmail" placeholder="Email" className="w-full px-3 py-2 border rounded" />
               <input id="addVendorAddress" placeholder="Address" className="w-full px-3 py-2 border rounded" />
-              <button onClick={saveNewVendor} className="w-full py-2 bg-blue-600 text-white rounded">Save Vendor</button>
+              <button onClick={saveNewVendor} className="w-full py-2 bg-cyan-600 text-white rounded">Save Vendor</button>
             </div>
           </div>
         </div>
@@ -938,100 +1011,102 @@ const Purchase = () => {
                   <input type="datetime-local" id="purchaseDateTime" className="px-3 py-2 border rounded" defaultValue={new Date().toISOString().slice(0, 16)} />
                 </div>
 
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="p-2">Product</th>
-                      <th className="p-2">Qty</th>
-                      <th className="p-2">Unit</th>
-                      <th className="p-2">Disc %</th>
-                      <th className="p-2">GST %</th>
-                      <th className="p-2">Cost</th>
-                      <th className="p-2">Sell</th>
-                      <th className="p-2">Total</th>
-                      <th className="p-2">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {purchaseItems.map(item => (
-                      <tr key={item.id} data-row-id={item.id}>
-                        <td className="p-1">
-                          <input
-                            id={`add-product-input-${item.id}`}
-                            type="text"
-                            placeholder="Search product..."
-                            value={item.product_name || ''}
-                            onChange={(e) => setPurchaseItems(prev => prev.map(i =>
-                              i.id === item.id ? { ...i, product_name: e.target.value } : i
-                            ))}
-                            className="w-full p-1 border rounded text-sm"
-                          />
-                          <input type="hidden" id={`add-product-id-${item.id}`} />
-                          <div id={`add-suggestions-${item.id}`} className="border rounded mt-1 max-h-32 overflow-y-auto"></div>
-                        </td>
-                        <td className="p-1">
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={item.quantity}
-                            onChange={e => setPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity: parseFloat(e.target.value) || 0, total: calculateRowTotal({ ...i, quantity: parseFloat(e.target.value) || 0 }) } : i))}
-                            className="w-16 p-1 border rounded"
-                          />
-                        </td>
-                        <td className="p-1">
-                          <select
-                            className="purchase-unit w-full p-1 border rounded text-sm"
-                            value={item.unit_id}
-                            onChange={(e) => setPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, unit_id: e.target.value } : i))}
-                          >
-                            <option value="">Select</option>
-                          </select>
-                        </td>
-                        <td className="p-1">
-                          <input
-                            type="number"
-                            className="purchase-discount w-16 p-1 border rounded"
-                            value={item.discount}
-                            onChange={e => setPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, discount: parseFloat(e.target.value) || 0, total: calculateRowTotal({ ...i, discount: parseFloat(e.target.value) || 0 }) } : i))}
-                          />
-                        </td>
-                        <td className="p-1">
-                          <input
-                            type="number"
-                            className="purchase-gst w-16 p-1 border rounded"
-                            value={item.gst}
-                            onChange={e => setPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, gst: parseFloat(e.target.value) || 0, total: calculateRowTotal({ ...i, gst: parseFloat(e.target.value) || 0 }) } : i))}
-                          />
-                        </td>
-                        <td className="p-1">
-                          <input
-                            type="number"
-                            step="0.01"
-                            className="purchase-cost w-full p-1 border rounded"
-                            value={item.per_item_cost}
-                            onChange={e => setPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, per_item_cost: parseFloat(e.target.value) || 0, total: calculateRowTotal({ ...i, per_item_cost: parseFloat(e.target.value) || 0 }) } : i))}
-                          />
-                        </td>
-                        <td className="p-1">
-                          <input
-                            type="number"
-                            step="0.01"
-                            className="purchase-selling-price w-full p-1 border rounded"
-                            value={item.selling_price}
-                            onChange={e => setPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, selling_price: parseFloat(e.target.value) || 0 } : i))}
-                          />
-                        </td>
-                        <td className="p-1 text-right">{getCurrencySymbol()}{item.total.toFixed(2)}</td>
-                        <td className="p-1 text-center">
-                          <button type="button" onClick={() => removeItem(item.id, false)} className="text-red-600"><X className="w-4 h-4" /></button>
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm min-w-[800px]">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="p-2">Product</th>
+                        <th className="p-2">Qty</th>
+                        <th className="p-2">Unit</th>
+                        <th className="p-2">Disc %</th>
+                        <th className="p-2">GST %</th>
+                        <th className="p-2">Cost</th>
+                        <th className="p-2">Sell</th>
+                        <th className="p-2">Total</th>
+                        <th className="p-2">Action</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {purchaseItems.map(item => (
+                        <tr key={`add-item-${item.id}`} data-row-id={item.id}>
+                          <td className="p-1">
+                            <input
+                              id={`add-product-input-${item.id}`}
+                              type="text"
+                              placeholder="Search product..."
+                              value={item.product_name || ''}
+                              onChange={(e) => setPurchaseItems(prev => prev.map(i =>
+                                i.id === item.id ? { ...i, product_name: e.target.value } : i
+                              ))}
+                              className="w-full p-1 border rounded text-sm"
+                            />
+                            <input type="hidden" id={`add-product-id-${item.id}`} />
+                            <div id={`add-suggestions-${item.id}`} className="border rounded mt-1 max-h-32 overflow-y-auto"></div>
+                          </td>
+                          <td className="p-1">
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={item.quantity}
+                              onChange={e => setPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity: parseFloat(e.target.value) || 0, total: calculateRowTotal({ ...i, quantity: parseFloat(e.target.value) || 0 }) } : i))}
+                              className="w-16 p-1 border rounded"
+                            />
+                          </td>
+                          <td className="p-1">
+                            <select
+                              className="purchase-unit w-full p-1 border rounded text-sm"
+                              value={item.unit_id}
+                              onChange={(e) => setPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, unit_id: e.target.value } : i))}
+                            >
+                              <option value="">Select</option>
+                            </select>
+                          </td>
+                          <td className="p-1">
+                            <input
+                              type="number"
+                              className="purchase-discount w-16 p-1 border rounded"
+                              value={item.discount}
+                              onChange={e => setPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, discount: parseFloat(e.target.value) || 0, total: calculateRowTotal({ ...i, discount: parseFloat(e.target.value) || 0 }) } : i))}
+                            />
+                          </td>
+                          <td className="p-1">
+                            <input
+                              type="number"
+                              className="purchase-gst w-16 p-1 border rounded"
+                              value={item.gst}
+                              onChange={e => setPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, gst: parseFloat(e.target.value) || 0, total: calculateRowTotal({ ...i, gst: parseFloat(e.target.value) || 0 }) } : i))}
+                            />
+                          </td>
+                          <td className="p-1">
+                            <input
+                              type="number"
+                              step="0.01"
+                              className="purchase-cost w-full p-1 border rounded"
+                              value={item.per_item_cost}
+                              onChange={e => setPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, per_item_cost: parseFloat(e.target.value) || 0, total: calculateRowTotal({ ...i, per_item_cost: parseFloat(e.target.value) || 0 }) } : i))}
+                            />
+                          </td>
+                          <td className="p-1">
+                            <input
+                              type="number"
+                              step="0.01"
+                              className="purchase-selling-price w-full p-1 border rounded"
+                              value={item.selling_price}
+                              onChange={e => setPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, selling_price: parseFloat(e.target.value) || 0 } : i))}
+                            />
+                          </td>
+                          <td className="p-1 text-right">{getCurrencySymbol()}{item.total.toFixed(2)}</td>
+                          <td className="p-1 text-center">
+                            <button type="button" onClick={() => removeItem(item.id, false)} className="text-red-600"><X className="w-4 h-4" /></button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
 
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => addItemRow(false)} className="text-blue-600 text-sm">+ Add Item</button>
+                  <button type="button" onClick={() => addItemRow(false)} className="text-cyan-600 text-sm">+ Add Item</button>
                   <button type="button" onClick={() => recalculateAll(purchaseItems, setPurchaseItems)} className="bg-yellow-500 text-white px-3 py-1 rounded text-sm flex items-center gap-1"><Calculator className="w-4 h-4" /> Calculate</button>
                 </div>
 
@@ -1048,9 +1123,9 @@ const Purchase = () => {
                 </select>
 
                 <div className="flex gap-2">
-                  <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded">Save Purchase</button>
+                  <button type="submit" className="flex-1 bg-cyan-600 text-white py-2 rounded">Save Purchase</button>
                   <button type="button" onClick={() => { setShowAddPurchase(false); setPurchaseItems([]); }} className="flex-1 bg-gray-300 py-2 rounded">Cancel</button>
-                </div>
+               </div>
               </div>
             </form>
           </div>
@@ -1072,100 +1147,102 @@ const Purchase = () => {
                 <input type="datetime-local" value={editForm.dateTime} onChange={e => setEditForm(prev => ({ ...prev, dateTime: e.target.value }))} className="px-3 py-2 border rounded" />
               </div>
 
-              <table className="w-full text-sm">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="p-2">Product</th>
-                    <th className="p-2">Qty</th>
-                    <th className="p-2">Unit</th>
-                    <th className="p-2">Disc %</th>
-                    <th className="p-2">GST %</th>
-                    <th className="p-2">Cost</th>
-                    <th className="p-2">Sell</th>
-                    <th className="p-2">Total</th>
-                    <th className="p-2">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {editPurchaseItems.map(item => (
-                    <tr key={item.id} data-row-id={item.id}>
-                      <td className="p-1">
-                        <input
-                          id={`edit-product-input-${item.id}`}
-                          type="text"
-                          placeholder="Search product..."
-                          value={item.product_name || ''}
-                          onChange={(e) => setEditPurchaseItems(prev => prev.map(i =>
-                            i.id === item.id ? { ...i, product_name: e.target.value } : i
-                          ))}
-                          className="w-full p-1 border rounded text-sm"
-                        />
-                        <input type="hidden" id={`edit-product-id-${item.id}`} />
-                        <div id={`edit-suggestions-${item.id}`} className="border rounded mt-1 max-h-32 overflow-y-auto"></div>
-                      </td>
-                      <td className="p-1">
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={item.quantity}
-                          onChange={e => setEditPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity: parseFloat(e.target.value) || 0, total: calculateRowTotal({ ...i, quantity: parseFloat(e.target.value) || 0 }) } : i))}
-                          className="w-16 p-1 border rounded"
-                        />
-                      </td>
-                      <td className="p-1">
-                        <select
-                          className="purchase-unit w-full p-1 border rounded text-sm"
-                          value={item.unit_id}
-                          onChange={(e) => setEditPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, unit_id: e.target.value } : i))}
-                        >
-                          <option value="">Select</option>
-                        </select>
-                      </td>
-                      <td className="p-1">
-                        <input
-                          type="number"
-                          className="purchase-discount w-16 p-1 border rounded"
-                          value={item.discount}
-                          onChange={e => setEditPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, discount: parseFloat(e.target.value) || 0, total: calculateRowTotal({ ...i, discount: parseFloat(e.target.value) || 0 }) } : i))}
-                        />
-                      </td>
-                      <td className="p-1">
-                        <input
-                          type="number"
-                          className="purchase-gst w-16 p-1 border rounded"
-                          value={item.gst}
-                          onChange={e => setEditPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, gst: parseFloat(e.target.value) || 0, total: calculateRowTotal({ ...i, gst: parseFloat(e.target.value) || 0 }) } : i))}
-                        />
-                      </td>
-                      <td className="p-1">
-                        <input
-                          type="number"
-                          step="0.01"
-                          className="purchase-cost w-full p-1 border rounded"
-                          value={item.per_item_cost}
-                          onChange={e => setEditPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, per_item_cost: parseFloat(e.target.value) || 0, total: calculateRowTotal({ ...i, per_item_cost: parseFloat(e.target.value) || 0 }) } : i))}
-                        />
-                      </td>
-                      <td className="p-1">
-                        <input
-                          type="number"
-                          step="0.01"
-                          className="purchase-selling-price w-full p-1 border rounded"
-                          value={item.selling_price}
-                          onChange={e => setEditPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, selling_price: parseFloat(e.target.value) || 0 } : i))}
-                        />
-                      </td>
-                      <td className="p-1 text-right">{getCurrencySymbol()}{item.total.toFixed(2)}</td>
-                      <td className="p-1 text-center">
-                        <button type="button" onClick={() => removeItem(item.id, true)} className="text-red-600"><X className="w-4 h-4" /></button>
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[800px]">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="p-2">Product</th>
+                      <th className="p-2">Qty</th>
+                      <th className="p-2">Unit</th>
+                      <th className="p-2">Disc %</th>
+                      <th className="p-2">GST %</th>
+                      <th className="p-2">Cost</th>
+                      <th className="p-2">Sell</th>
+                      <th className="p-2">Total</th>
+                      <th className="p-2">Action</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {editPurchaseItems.map(item => (
+                      <tr key={`edit-item-${item.id}`} data-row-id={item.id}>
+                        <td className="p-1">
+                          <input
+                            id={`edit-product-input-${item.id}`}
+                            type="text"
+                            placeholder="Search product..."
+                            value={item.product_name || ''}
+                            onChange={(e) => setEditPurchaseItems(prev => prev.map(i =>
+                              i.id === item.id ? { ...i, product_name: e.target.value } : i
+                            ))}
+                            className="w-full p-1 border rounded text-sm"
+                          />
+                          <input type="hidden" id={`edit-product-id-${item.id}`} />
+                          <div id={`edit-suggestions-${item.id}`} className="border rounded mt-1 max-h-32 overflow-y-auto"></div>
+                        </td>
+                        <td className="p-1">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={item.quantity}
+                            onChange={e => setEditPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity: parseFloat(e.target.value) || 0, total: calculateRowTotal({ ...i, quantity: parseFloat(e.target.value) || 0 }) } : i))}
+                            className="w-16 p-1 border rounded"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <select
+                            className="purchase-unit w-full p-1 border rounded text-sm"
+                            value={item.unit_id}
+                            onChange={(e) => setEditPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, unit_id: e.target.value } : i))}
+                          >
+                            <option value="">Select</option>
+                          </select>
+                        </td>
+                        <td className="p-1">
+                          <input
+                            type="number"
+                            className="purchase-discount w-16 p-1 border rounded"
+                            value={item.discount}
+                            onChange={e => setEditPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, discount: parseFloat(e.target.value) || 0, total: calculateRowTotal({ ...i, discount: parseFloat(e.target.value) || 0 }) } : i))}
+                          />
+                        </td>
+                        <td className="p-1">
+                          <input
+                            type="number"
+                            className="purchase-gst w-16 p-1 border rounded"
+                            value={item.gst}
+                            onChange={e => setEditPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, gst: parseFloat(e.target.value) || 0, total: calculateRowTotal({ ...i, gst: parseFloat(e.target.value) || 0 }) } : i))}
+                          />
+                        </td>
+                        <td className="p-1">
+                          <input
+                            type="number"
+                            step="0.01"
+                            className="purchase-cost w-full p-1 border rounded"
+                            value={item.per_item_cost}
+                            onChange={e => setEditPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, per_item_cost: parseFloat(e.target.value) || 0, total: calculateRowTotal({ ...i, per_item_cost: parseFloat(e.target.value) || 0 }) } : i))}
+                          />
+                        </td>
+                        <td className="p-1">
+                          <input
+                            type="number"
+                            step="0.01"
+                            className="purchase-selling-price w-full p-1 border rounded"
+                            value={item.selling_price}
+                            onChange={e => setEditPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, selling_price: parseFloat(e.target.value) || 0 } : i))}
+                          />
+                        </td>
+                        <td className="p-1 text-right">{getCurrencySymbol()}{item.total.toFixed(2)}</td>
+                        <td className="p-1 text-center">
+                          <button type="button" onClick={() => removeItem(item.id, true)} className="text-red-600"><X className="w-4 h-4" /></button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
               <div className="flex gap-2">
-                <button type="button" onClick={() => addItemRow(true)} className="text-blue-600 text-sm">+ Add Item</button>
+                <button type="button" onClick={() => addItemRow(true)} className="text-cyan-600 text-sm">+ Add Item</button>
                 <button type="button" onClick={() => recalculateAll(editPurchaseItems, setEditPurchaseItems)} className="bg-yellow-500 text-white px-3 py-1 rounded text-sm flex items-center gap-1"><Calculator className="w-4 h-4" /> Calculate</button>
               </div>
 

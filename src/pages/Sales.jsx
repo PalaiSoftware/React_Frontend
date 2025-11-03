@@ -68,7 +68,6 @@ const handleProductSelection = async (row, productId) => {
     if (gstInput) gstInput.value = '0.00';
     if (costInput) costInput.value = parseFloat(productInfo.post_gst_sale_cost || 0).toFixed(2);
 
-    // ---- Update React state (keep product_name) ----
     const rowId = row.dataset.rowId;
     const isEdit = row.classList.contains('edit-row');
     const setState = isEdit ? setEditRowData : setSaleItems;
@@ -83,7 +82,7 @@ const handleProductSelection = async (row, productId) => {
                 ? {
                     ...i,
                     product_id: productId,
-                    product_name: row.querySelector(`input[id*="-product-input-"]`).value, // keep name
+                    product_name: row.querySelector(`input[id*="-product-input-"]`).value,
                     unit_id: units.length > 0 ? units[0].id : '',
                     discount: 0,
                     gst: 0,
@@ -106,7 +105,7 @@ const handleProductSelection = async (row, productId) => {
               ? {
                   ...i,
                   product_id: productId,
-                  product_name: row.querySelector(`input[id*="-product-input-"]`).value, // keep name
+                  product_name: row.querySelector(`input[id*="-product-input-"]`).value,
                   unit_id: units.length > 0 ? units[0].id : '',
                   discount: 0,
                   gst: 0,
@@ -262,7 +261,6 @@ export default function SalesDashboard() {
     return parseFloat(total.toFixed(2));
   };
 
-  // ---- FIXED recalculateAll – keep product_name ----
   const recalculateAll = (items, setItems) => {
     if (!Array.isArray(items)) return;
     setItems(items.map(item => ({
@@ -625,14 +623,14 @@ export default function SalesDashboard() {
             </div>
             <button
               onClick={() => setShowSearchCustomer(true)}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+              className="bg-cyan-600 text-white px-4 py-2 rounded-lg flex items-center gap-2"
             >
               <Plus className="w-5 h-5" /> Sale Bill
             </button>
           </div>
 
-          {/* Table */}
-          <div className="bg-white rounded-lg shadow overflow-hidden">
+          {/* ==================== DESKTOP TABLE VIEW ==================== */}
+          <div className="hidden lg:block bg-white rounded-lg shadow overflow-hidden">
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
@@ -692,7 +690,7 @@ export default function SalesDashboard() {
                         </td>
                         <td className="px-4 py-3">{sale.sales_by}</td>
                         <td className="px-4 py-3">
-                          <button onClick={() => downloadInvoice(sale.transaction_id)} className="text-blue-600">
+                          <button onClick={() => downloadInvoice(sale.transaction_id)} className="text-cyan-600">
                             <Download className="w-5 h-5" />
                           </button>
                         </td>
@@ -711,7 +709,6 @@ export default function SalesDashboard() {
                         </td>
                       </tr>
 
-                      {/* Inline Edit Table */}
                       {isEditing && edit && Array.isArray(edit.items) && (
                         <tr>
                           <td colSpan={8} className="p-0 bg-gray-50">
@@ -814,7 +811,7 @@ export default function SalesDashboard() {
                                   ))}
                                   <tr>
                                     <td colSpan={8}>
-                                      <button type="button" onClick={() => addItemRow(true)} className="text-blue-600 text-sm mr-2">+ Add Item</button>
+                                      <button type="button" onClick={() => addItemRow(true)} className="text-cyan-600 text-sm mr-2">+ Add Item</button>
                                       <button type="button" onClick={() => recalculateAll(editRowData?.items || [], items => setEditRowData(d => ({ ...d, items })))} className="bg-yellow-500 text-white px-3 py-1 rounded text-sm flex items-center gap-1">
                                         <Calculator className="w-4 h-4" /> Calculate
                                       </button>
@@ -841,6 +838,166 @@ export default function SalesDashboard() {
             </table>
           </div>
 
+          {/* ==================== MOBILE CARD VIEW ==================== */}
+          <div className="lg:hidden space-y-4">
+            {paginated.map((sale, i) => {
+              const isEditing = editingRow === sale.transaction_id;
+              const edit = isEditing ? editRowData : null;
+              const sno = (currentPage - 1) * itemsPerPage + i + 1;
+
+              return (
+                <div
+                  key={sale.transaction_id}
+                  className={`bg-white rounded-lg shadow p-4 ${isEditing ? 'ring-2 ring-cyan-500' : ''}`}
+                >
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <p className="text-sm font-semibold">#{sno} • {sale.date}</p>
+                      <p className="font-bold">{sale.bill_name}</p>
+                      <p className="text-sm text-gray-600">{sale.customer_name}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => downloadInvoice(sale.transaction_id)} className="text-cyan-600">
+                        <Download className="w-5 h-5" />
+                      </button>
+                      {isEditing ? (
+                        <>
+                          <button onClick={saveInlineEdit} className="text-green-600"><Save className="w-5 h-5" /></button>
+                          <button onClick={cancelInlineEdit} className="text-gray-600"><RotateCcw className="w-5 h-5" /></button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={() => startInlineEdit(sale)} className="text-green-600"><Edit className="w-5 h-5" /></button>
+                          <button onClick={() => deleteSale(sale.transaction_id)} className="text-red-600"><Trash2 className="w-5 h-5" /></button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="text-sm grid grid-cols-2 gap-2 mb-3">
+                    <div><strong>Payment:</strong> {reversePaymentModeMap[sale.payment_mode] || 'Cash'}</div>
+                    <div><strong>Sold By:</strong> {sale.sales_by}</div>
+                  </div>
+
+                  {/* Inline Edit Section */}
+                  {isEditing && edit && Array.isArray(edit.items) && (
+                    <div className="border-t pt-4 mt-4">
+                      <div className="space-y-3">
+                        <input
+                          type="datetime-local"
+                          value={edit.date || ''}
+                          onChange={e => setEditRowData(prev => ({ ...prev, date: e.target.value }))}
+                          className="w-full p-2 border rounded text-sm"
+                        />
+                        <input
+                          value={edit.bill_name || ''}
+                          onChange={e => setEditRowData(prev => ({ ...prev, bill_name: e.target.value }))}
+                          placeholder="Bill Name"
+                          className="w-full p-2 border rounded text-sm"
+                        />
+                        <select
+                          value={edit.payment_mode || 'cash'}
+                          onChange={e => setEditRowData(prev => ({ ...prev, payment_mode: e.target.value }))}
+                          className="w-full p-2 border rounded text-sm"
+                        >
+                          {Object.keys(paymentModeMap).map(m => (
+                            <option key={m} value={m}>{m.replace('_', ' ')}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="mt-4 space-y-3">
+                        {edit.items.map(item => (
+                          <div key={item.id} className="border p-3 rounded bg-gray-50">
+                            <input id={`edit-product-input-${item.id}`} type="text" placeholder="Product" defaultValue={item.product_name} className="w-full p-1 border rounded text-sm mb-1" />
+                            <input type="hidden" id={`edit-product-id-${item.id}`} value={item.product_id} />
+                            <div id={`edit-suggestions-${item.id}`} className="border rounded mt-1 max-h-24 overflow-y-auto text-xs"></div>
+
+                            <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
+                              <input type="number" step="0.01" placeholder="Qty" value={item.quantity} onChange={e => {
+                                const qty = parseFloat(e.target.value) || 0;
+                                setEditRowData(prev => ({
+                                  ...prev,
+                                  items: (prev?.items || []).map(i =>
+                                    i.id === item.id
+                                      ? { ...i, quantity: qty, total: calculateRowTotal({ ...i, quantity: qty }) }
+                                      : i
+                                  )
+                                }));
+                              }} className="p-1 border rounded" />
+                              <select className="sale-unit p-1 border rounded" value={item.unit_id} onChange={e => {
+                                setEditRowData(prev => ({
+                                  ...prev,
+                                  items: (prev?.items || []).map(i =>
+                                    i.id === item.id ? { ...i, unit_id: e.target.value } : i
+                                  )
+                                }));
+                              }}>
+                                <option value="">Unit</option>
+                              </select>
+                              <input type="number" placeholder="Disc %" className="sale-discount p-1 border rounded" value={item.discount} onChange={e => {
+                                const disc = parseFloat(e.target.value) || 0;
+                                setEditRowData(prev => ({
+                                  ...prev,
+                                  items: (prev?.items || []).map(i =>
+                                    i.id === item.id
+                                      ? { ...i, discount: disc, total: calculateRowTotal({ ...i, discount: disc }) }
+                                      : i
+                                  )
+                                }));
+                              }} />
+                              <input type="number" placeholder="GST %" className="sale-gst p-1 border rounded" value={item.gst} onChange={e => {
+                                const gst = parseFloat(e.target.value) || 0;
+                                setEditRowData(prev => ({
+                                  ...prev,
+                                  items: (prev?.items || []).map(i =>
+                                    i.id === item.id
+                                      ? { ...i, gst, total: calculateRowTotal({ ...i, gst }) }
+                                      : i
+                                  )
+                                }));
+                              }} />
+                              <input id={`edit-cost-${item.id}`} type="number" step="0.01" placeholder="Cost" className="sale-cost p-1 border rounded" value={item.cost} onChange={e => {
+                                const cost = parseFloat(e.target.value) || 0;
+                                setEditRowData(prev => ({
+                                  ...prev,
+                                  items: (prev?.items || []).map(i =>
+                                    i.id === item.id
+                                      ? { ...i, cost, total: calculateRowTotal({ ...i, cost }) }
+                                      : i
+                                  )
+                                }));
+                              }} />
+                              <div className="p-1 font-medium">{currency}{item.total.toFixed(2)}</div>
+                            </div>
+                            <button type="button" onClick={() => setEditRowData(prev => ({
+                              ...prev,
+                              items: (prev?.items || []).filter(i => i.id !== item.id)
+                            }))} className="text-red-600 mt-1">
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                        <button type="button" onClick={() => addItemRow(true)} className="text-cyan-600 text-sm">+ Add Item</button>
+                        <button type="button" onClick={() => recalculateAll(editRowData?.items || [], items => setEditRowData(d => ({ ...d, items })))} className="bg-yellow-500 text-white px-3 py-1 rounded text-sm flex items-center gap-1 ml-2">
+                          <Calculator className="w-4 h-4" /> Calculate
+                        </button>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+                        <div><strong>Final:</strong> {currency}{getFinalTotal(edit.items)}</div>
+                        <input type="number" step="0.01" placeholder="Abs. Discount" value={edit.absolute_discount || ''} onChange={e => setEditRowData(prev => ({ ...prev, absolute_discount: parseFloat(e.target.value) || 0 }))} className="p-2 border rounded" />
+                        <div><strong>Payable:</strong> {currency}{(getFinalTotal(edit.items) - (edit.absolute_discount || 0)).toFixed(2)}</div>
+                        <input type="number" step="0.01" placeholder="Paid" value={edit.paid_amount || ''} onChange={e => setEditRowData(prev => ({ ...prev, paid_amount: parseFloat(e.target.value) || 0 }))} className="p-2 border rounded" />
+                        <div><strong>Due:</strong> {currency}{(getFinalTotal(edit.items) - (edit.absolute_discount || 0) - (edit.paid_amount || 0)).toFixed(2)}</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
           {/* Pagination */}
           <div className="flex justify-center items-center gap-4 mt-6">
             <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"><ChevronLeft /></button>
@@ -849,7 +1006,7 @@ export default function SalesDashboard() {
           </div>
         </div>
 
-        {/* Customer Search Modal */}
+        {/* Modals (unchanged) */}
         {showSearchCustomer && (
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-lg max-w-2xl w-full max-h-screen overflow-y-auto">
@@ -889,7 +1046,6 @@ export default function SalesDashboard() {
           </div>
         )}
 
-        {/* Add Sale Modal */}
         {showAddSale && (
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-lg max-w-4xl w-full max-h-screen overflow-y-auto">
@@ -999,7 +1155,7 @@ export default function SalesDashboard() {
                       </tbody>
                     </table>
                     <div className="flex gap-2">
-                      <button type="button" onClick={() => addItemRow()} className="text-blue-600 text-sm">+ Add Item</button>
+                      <button type="button" onClick={() => addItemRow()} className="text-cyan-600 text-sm">+ Add Item</button>
                       <button type="button" onClick={() => recalculateAll(saleItems, setSaleItems)} className="bg-yellow-500 text-white px-3 py-1 rounded text-sm flex items-center gap-1">
                         <Calculator className="w-4 h-4" /> Calculate
                       </button>
@@ -1021,7 +1177,7 @@ export default function SalesDashboard() {
                   </select>
 
                   <div className="flex gap-2">
-                    <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded">Save</button>
+                    <button type="submit" className="flex-1 bg-cyan-600 text-white py-2 rounded">Save</button>
                     <button type="button" onClick={() => {
                       setShowAddSale(false);
                       setSaleItems([]);
@@ -1036,7 +1192,7 @@ export default function SalesDashboard() {
 
         {/* Toast */}
         {toast && (
-          <div className={`fixed bottom-4 right-4 p-4 rounded-lg text-white shadow-lg ${toast.error ? 'bg-red-600' : 'bg-green-600'}`}>
+          <div className={`fixed bottom-4 right-4 p-4 rounded-lg text-white shadow-lg ${toast.error ? 'bg-red-600' : 'bg-green-600'} animate-pulse`}>
             {toast.msg}
           </div>
         )}

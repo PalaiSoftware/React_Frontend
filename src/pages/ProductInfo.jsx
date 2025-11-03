@@ -564,6 +564,7 @@ export default function ProductInfo() {
                       <strong>Unit:</strong>{' '}
                       {isEditing ? (
                         <select
+                        key={p.id + '-unit'}
                           value={editForm.unit_name || ''}
                           onChange={(e) =>
                             setEditForm({ ...editForm, unit_name: e.target.value })
@@ -752,7 +753,7 @@ export default function ProductInfo() {
         </div>
       </div>
 
-      <style jsx>{`
+      {/* <style jsx>{`
         @keyframes slide-in {
           from {
             transform: translateX(100%);
@@ -766,7 +767,26 @@ export default function ProductInfo() {
         .animate-slide-in {
           animation: slide-in 0.3s ease-out;
         }
-      `}</style>
+      `}</style> */}
+      <style
+  dangerouslySetInnerHTML={{
+    __html: `
+      @keyframes slide-in {
+        from {
+          transform: translateX(100%);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+      .animate-slide-in {
+        animation: slide-in 0.3s ease-out;
+      }
+    `,
+  }}
+/>
     </>
   );
 }
