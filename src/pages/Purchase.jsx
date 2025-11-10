@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
-  Search, Plus, Download, Edit, Trash2, ChevronLeft, ChevronRight,
-  X, Save, RotateCcw, Calculator, User
+  Search, Plus, X, Calculator, User, ChevronLeft, ChevronRight,
+  Edit as EditIcon, Trash2
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom'; // React Router navigation
+import { useNavigate } from 'react-router-dom';
 
 const API_BASE_URL = "http://127.0.0.1:8000/api";
 
@@ -15,26 +15,50 @@ const reversePaymentModeMap = Object.fromEntries(
 );
 
 /* ------------------------------------------------------------------ */
-/* Helper: Populate unit dropdown                                            */
-/* ------------------------------------------------------------------ */
-const populateUnitDropdown = (selectEl, units) => {
-  selectEl.innerHTML = '<option value="">Select</option>';
-  units.forEach(u => {
-    const opt = document.createElement('option');
-    opt.value = u.id;
-    opt.textContent = u.name || u.unit_name || u.id;
-    selectEl.appendChild(opt);
-  });
+/* Debounce */
+const debounce = (fn, delay) => {
+  let t;
+  return (...args) => {
+    clearTimeout(t);
+    t = setTimeout(() => fn(...args), delay);
+  };
 };
 
 /* ------------------------------------------------------------------ */
-/* Async product selection handler (your exact logic)                         */
+/* Toast Hook */
+const useToast = () => {
+  const [toast, setToast] = useState({ show: false, msg: '', error: false });
+
+  const show = (msg, error = false) => {
+    setToast({ show: true, msg, error });
+    setTimeout(() => setToast({ show: false, msg: '', error: false }), 3000);
+  };
+
+  return { toast, show };
+};
+
 /* ------------------------------------------------------------------ */
-const handleProductSelection = async (row, productId, setItems, rowId) => {
+/* Row Total Calculator */
+const calcRowTotal = (item) => {
+  const qty = Number(item.quantity) || 0;
+  const cost = Number(item.per_item_cost) || 0;
+  const disc = Number(item.discount) || 0;
+  const gst = Number(item.gst) || 0;
+
+  let total = qty * cost;
+  total -= total * (disc / 100);
+  total += total * (gst / 100);
+  return Number(total.toFixed(2));
+};
+
+/* ------------------------------------------------------------------ */
+/* Handle Product Selection (Full Unit Pricing Logic) */
+const handleProductSelection = async (row, productId, setItems, rowId, showToast) => {
   if (!productId) return;
+
+  const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
   try {
-    const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
-    const response = await fetch(`${API_BASE_URL}/units/${productId}`, {
+    const res = await fetch(`${API_BASE_URL}/units/${productId}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -43,69 +67,118 @@ const handleProductSelection = async (row, productId, setItems, rowId) => {
       }
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Network error: ${response.status} - ${errorText}`);
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(`Network error: ${res.status} - ${errorText}`);
     }
 
-    const result = await response.json();
-    const productInfo = result.product_info || {};
-    const units = Array.isArray(result.units) ? result.units : [];
+    const data = await res.json();
+    const unitPricing = Array.isArray(data.unit_pricing) ? data.unit_pricing : [];
 
     const unitSelect = row.querySelector('.purchase-unit');
-    const discountInput = row.querySelector('.purchase-discount');
-    const gstInput = row.querySelector('.purchase-gst');
     const costInput = row.querySelector('.purchase-cost');
+    const gstInput = row.querySelector('.purchase-gst');
     const sellInput = row.querySelector('.purchase-selling-price');
+    const discountInput = row.querySelector('.purchase-discount');
 
-    if (productInfo && unitSelect) {
-      populateUnitDropdown(unitSelect, units);
+    if (!unitSelect) return;
 
-      const defaultUnitId = units.length > 0 ? units[0].id : '';
-      unitSelect.value = defaultUnitId;
-      unitSelect.dataset.fetched = 'true';
+    // Clear and populate unit dropdown
+    unitSelect.innerHTML = '<option value="" disabled selected>Select Unit</option>';
+    unitPricing.forEach(unit => {
+      const option = document.createElement('option');
+      option.value = unit.unit_id;
+      option.textContent = unit.unit_name;
+      option.dataset.purchasePrice = unit.purchase_price || 0;
+      option.dataset.salePrice = unit.sale_price || 0;
+      option.dataset.gst = unit.gst || 0;
+      option.dataset.profitPercentage = unit.profit_percentage || 0;
+      unitSelect.appendChild(option);
+    });
 
-      if (discountInput) discountInput.value = 0;
-      if (gstInput) gstInput.value = 0;
-      if (costInput) costInput.value = parseFloat(productInfo.purchase_price) || 0;
-      if (sellInput) sellInput.value = parseFloat(productInfo.post_gst_sale_cost) || 0;
+    if (unitPricing.length === 0) {
+      showToast('No unit pricing data available for this product.', true);
+      return;
+    }
+
+    // Set default to first unit
+    const firstUnit = unitPricing[0];
+    unitSelect.value = firstUnit.unit_id;
+    costInput.value = Number(firstUnit.purchase_price || 0).toFixed(2);
+    gstInput.value = Number(firstUnit.gst || 0).toFixed(2);
+    sellInput.value = Number(firstUnit.sale_price || 0).toFixed(2);
+    discountInput.value = '0.00';
+
+    // Update React state
+    setItems(prev => prev.map(i =>
+      i.id === rowId
+        ? {
+            ...i,
+            product_id: productId,
+            unit_id: firstUnit.unit_id,
+            per_item_cost: Number(firstUnit.purchase_price || 0),
+            gst: Number(firstUnit.gst || 0),
+            selling_price: Number(firstUnit.sale_price || 0),
+            discount: 0,
+            total: calcRowTotal({
+              ...i,
+              per_item_cost: Number(firstUnit.purchase_price || 0),
+              quantity: i.quantity || 0,
+              discount: 0,
+              gst: Number(firstUnit.gst || 0)
+            })
+          }
+        : i
+    ));
+
+    // Unit change event listener (replace existing to avoid duplicates)
+    const handleUnitChange = (e) => {
+      const selectedOption = e.target.options[e.target.selectedIndex];
+      if (!selectedOption.dataset.salePrice) return;
+
+      const purchasePrice = Number(selectedOption.dataset.purchasePrice || 0);
+      const salePrice = Number(selectedOption.dataset.salePrice || 0);
+      const gst = Number(selectedOption.dataset.gst || 0);
+
+      costInput.value = purchasePrice.toFixed(2);
+      gstInput.value = gst.toFixed(2);
+      sellInput.value = salePrice.toFixed(2);
+      discountInput.value = '0.00';
 
       setItems(prev => prev.map(i =>
-        i.id == rowId
+        i.id === rowId
           ? {
               ...i,
-              product_id: productId,
-              per_item_cost: parseFloat(productInfo.purchase_price) || 0,
-              selling_price: parseFloat(productInfo.post_gst_sale_cost) || 0,
-              unit_id: defaultUnitId,
+              unit_id: selectedOption.value,
+              per_item_cost: purchasePrice,
+              gst: gst,
+              selling_price: salePrice,
               discount: 0,
-              gst: 0,
-              total: calculateRowTotal({
+              total: calcRowTotal({
                 ...i,
-                per_item_cost: parseFloat(productInfo.purchase_price) || 0,
+                per_item_cost: purchasePrice,
                 quantity: i.quantity || 0,
                 discount: 0,
-                gst: 0
+                gst: gst
               })
             }
           : i
       ));
-    }
+    };
+
+    unitSelect.onchange = handleUnitChange;
+
   } catch (error) {
-    console.error('Error fetching product details:', error);
-    window.__showToast?.(`Failed to load product: ${error.message}`);
+    console.error('Error fetching units:', error);
+    showToast(`Failed to fetch units: ${error.message}`, true);
   }
 };
 
-const calculateRowTotal = (item) => {
-  let total = (item.quantity || 0) * (item.per_item_cost || 0);
-  total -= total * (item.discount || 0) / 100;
-  total += total * (item.gst || 0) / 100;
-  return parseFloat(total.toFixed(2));
-};
-
+/* ------------------------------------------------------------------ */
 const Purchase = () => {
-  const navigate = useNavigate(); // Navigation hook
+  const navigate = useNavigate();
+  const { toast, show: showToast } = useToast();
+
   const [user, setUser] = useState({});
   const [userName, setUserName] = useState('Loading...');
   const [vendorsList, setVendorsList] = useState([]);
@@ -123,7 +196,6 @@ const Purchase = () => {
   const [editTransactionId, setEditTransactionId] = useState(null);
   const [editOriginalPaidAmount, setEditOriginalPaidAmount] = useState(0);
   const [allProducts, setAllProducts] = useState([]);
-  const [toast, setToast] = useState({ show: false, message: '' });
   const [detailsCache, setDetailsCache] = useState({});
   const [openDetails, setOpenDetails] = useState({});
   const [vendorSearchResults, setVendorSearchResults] = useState([]);
@@ -135,15 +207,6 @@ const Purchase = () => {
 
   const itemsPerPage = 50;
   const autocompleteRefs = useRef({});
-
-  useEffect(() => {
-    window.__showToast = (msg) => showToast(msg);
-  }, []);
-
-  const showToast = (msg) => {
-    setToast({ show: true, message: msg });
-    setTimeout(() => setToast({ show: false, message: '' }), 3000);
-  };
 
   /* ------------------------------------------------------------------ */
   /* USER & INITIAL DATA */
@@ -190,7 +253,7 @@ const Purchase = () => {
       setVendorsList(vendors);
       return vendors;
     } catch (err) {
-      showToast('Failed to fetch vendors');
+      showToast('Failed to fetch vendors', true);
       return [];
     }
   };
@@ -212,7 +275,7 @@ const Purchase = () => {
       setAllPurchases(purchases);
       setFilteredPurchases(purchases);
     } catch (err) {
-      showToast('Failed to fetch purchases');
+      showToast('Failed to fetch purchases', true);
     }
   };
 
@@ -231,7 +294,7 @@ const Purchase = () => {
       }));
       setAllProducts(products);
     } catch (err) {
-      showToast('Failed to load products');
+      showToast('Failed to load products', true);
     }
   };
 
@@ -264,54 +327,162 @@ const Purchase = () => {
   const totalPages = Math.ceil(filteredPurchases.length / itemsPerPage);
 
   /* ------------------------------------------------------------------ */
-  /* AUTOCOMPLETE + PRODUCT SELECTION */
+  /* AUTOCOMPLETE SETUP */
   /* ------------------------------------------------------------------ */
-  const setupAutocomplete = (rowId, inputRef, isEdit = false) => {
-    const suggestions = document.getElementById(`${isEdit ? 'edit' : 'add'}-suggestions-${rowId}`);
-    if (!suggestions || !inputRef.current) return;
+  // const setupAutocomplete = (rowId, inputRef, isEdit = false) => {
+  //   const suggestionsContainer = document.getElementById(`${isEdit ? 'edit' : 'add'}-suggestions-${rowId}`);
+  //   if (!suggestionsContainer || !inputRef.current) return;
 
-    let timeout;
-    const handle = () => {
-      clearTimeout(timeout);
-      timeout = setTimeout(() => {
-        const val = inputRef.current.value.toLowerCase();
-        suggestions.innerHTML = '';
-        if (!val || val.length < 2) return;
+  //   const handleInput = debounce(() => {
+  //     const query = inputRef.current.value.trim().toLowerCase();
+  //     suggestionsContainer.innerHTML = '';
+  //     suggestionsContainer.style.display = 'none';
 
-        const filtered = allProducts.filter(p =>
-          p.product_name?.toLowerCase().includes(val) ||
-          p.hscode?.toLowerCase().includes(val)
-        ).slice(0, 12);
+  //     if (query.length < 2) return;
 
-        filtered.forEach(p => {
-          const div = document.createElement('div');
-          div.textContent = p.product_name;
-          div.className = 'p-2 hover:bg-gray-100 cursor-pointer border-b text-sm';
-          div.onclick = async () => {
-            const setItems = isEdit ? setEditPurchaseItems : setPurchaseItems;
-            setItems(prev => prev.map(i =>
-              i.id === rowId
-                ? { ...i, product_id: p.id, product_name: p.product_name }
-                : i
-            ));
+  //     const filteredProducts = allProducts.filter(product =>
+  //       (product.product_name && product.product_name.toLowerCase().includes(query)) ||
+  //       (product.hscode && product.hscode.toLowerCase().includes(query))
+  //     ).slice(0, 12);
 
-            const productIdInput = document.getElementById(`${isEdit ? 'edit' : 'add'}-product-id-${rowId}`);
-            if (productIdInput) productIdInput.value = p.id;
+  //     if (filteredProducts.length === 0) return;
 
-            const row = inputRef.current.closest('tr');
-            if (row) {
-              await handleProductSelection(row, p.id, setItems, rowId);
-            }
+  //     filteredProducts.forEach(product => {
+  //       const suggestion = document.createElement('div');
+  //       suggestion.textContent = product.product_name;
+  //       suggestion.className = 'p-2 hover:bg-gray-100 cursor-pointer border-b text-sm';
+  //       suggestion.dataset.productId = product.id;
+  //       suggestion.addEventListener('click', async () => {
+  //         inputRef.current.value = product.product_name;
+  //         const hiddenInput = document.getElementById(`${isEdit ? 'edit' : 'add'}-product-id-${rowId}`);
+  //         if (hiddenInput) hiddenInput.value = product.id;
 
-            suggestions.innerHTML = '';
-          };
-          suggestions.appendChild(div);
-        });
-      }, 200);
-    };
-    inputRef.current.oninput = handle;
+  //         suggestionsContainer.innerHTML = '';
+  //         suggestionsContainer.style.display = 'none';
+
+  //         const setItems = isEdit ? setEditPurchaseItems : setPurchaseItems;
+  //         setItems(prev => prev.map(i =>
+  //           i.id === rowId ? { ...i, product_id: product.id, product_name: product.product_name } : i
+  //         ));
+
+  //         const row = inputRef.current.closest('tr');
+  //         if (row) {
+  //           await handleProductSelection(row, product.id, setItems, rowId, showToast);
+  //         }
+  //       });
+  //       suggestionsContainer.appendChild(suggestion);
+  //     });
+  //     suggestionsContainer.style.display = 'block';
+  //   }, 300);
+
+  //   inputRef.current.addEventListener('input', handleInput);
+
+  //   // Hide on click outside
+  //   const hideSuggestions = (e) => {
+  //     if (!row.contains(e.target)) {
+  //       suggestionsContainer.style.display = 'none';
+  //     }
+  //   };
+  //   document.addEventListener('click', hideSuggestions);
+
+  //   // Keyboard navigation
+  //   inputRef.current.addEventListener('keydown', (e) => {
+  //     const suggestions = suggestionsContainer.querySelectorAll('div');
+  //     if (suggestions.length === 0) return;
+
+  //     let selectedIndex = -1;
+  //     suggestions.forEach((s, index) => {
+  //       if (s.classList.contains('selected')) selectedIndex = index;
+  //     });
+
+  //     if (e.key === 'ArrowDown') {
+  //       e.preventDefault();
+  //       selectedIndex = (selectedIndex + 1) % suggestions.length;
+  //       suggestions.forEach(s => s.classList.remove('selected'));
+  //       suggestions[selectedIndex].classList.add('selected');
+  //       suggestions[selectedIndex].scrollIntoView({ block: 'nearest' });
+  //     } else if (e.key === 'ArrowUp') {
+  //       e.preventDefault();
+  //       selectedIndex = (selectedIndex - 1 + suggestions.length) % suggestions.length;
+  //       suggestions.forEach(s => s.classList.remove('selected'));
+  //       suggestions[selectedIndex].classList.add('selected');
+  //       suggestions[selectedIndex].scrollIntoView({ block: 'nearest' });
+  //     } else if (e.key === 'Enter' && selectedIndex >= 0) {
+  //       e.preventDefault();
+  //       suggestions[selectedIndex].click();
+  //     } else if (e.key === 'Escape') {
+  //       suggestionsContainer.style.display = 'none';
+  //     }
+  //   });
+
+  //   return () => {
+  //     inputRef.current.removeEventListener('input', handleInput);
+  //     document.removeEventListener('click', hideSuggestions);
+  //   };
+  // };
+const setupAutocomplete = (rowId, inputRef, isEdit = false) => {
+  const suggestionsContainer = document.getElementById(`${isEdit ? 'edit' : 'add'}-suggestions-${rowId}`);
+  if (!suggestionsContainer || !inputRef.current) return;
+
+  const row = inputRef.current.closest('tr'); // Capture row here
+
+  const handleInput = debounce(() => {
+    const query = inputRef.current.value.trim().toLowerCase();
+    suggestionsContainer.innerHTML = '';
+    suggestionsContainer.style.display = 'none';
+    if (query.length < 2) return;
+
+    const filteredProducts = allProducts.filter(product =>
+      (product.product_name && product.product_name.toLowerCase().includes(query)) ||
+      (product.hscode && product.hscode.toLowerCase().includes(query))
+    ).slice(0, 12);
+
+    if (filteredProducts.length === 0) return;
+
+    filteredProducts.forEach(product => {
+      const suggestion = document.createElement('div');
+      suggestion.textContent = product.product_name;
+      suggestion.className = 'p-2 hover:bg-gray-100 cursor-pointer border-b text-sm';
+      suggestion.dataset.productId = product.id;
+      suggestion.addEventListener('click', async () => {
+        inputRef.current.value = product.product_name;
+        const hiddenInput = document.getElementById(`${isEdit ? 'edit' : 'add'}-product-id-${rowId}`);
+        if (hiddenInput) hiddenInput.value = product.id;
+        suggestionsContainer.innerHTML = '';
+        suggestionsContainer.style.display = 'none';
+
+        const setItems = isEdit ? setEditPurchaseItems : setPurchaseItems;
+        setItems(prev => prev.map(i =>
+          i.id === rowId ? { ...i, product_id: product.id, product_name: product.product_name } : i
+        ));
+
+        // Use the captured `row` here too
+        if (row) {
+          await handleProductSelection(row, product.id, setItems, rowId, showToast);
+        }
+      });
+      suggestionsContainer.appendChild(suggestion);
+    });
+    suggestionsContainer.style.display = 'block';
+  }, 300);
+
+  inputRef.current.addEventListener('input', handleInput);
+
+  // Fix: Use the captured `row`
+  const hideSuggestions = (e) => {
+    if (row && !row.contains(e.target)) {
+      suggestionsContainer.style.display = 'none';
+    }
   };
+  document.addEventListener('click', hideSuggestions);
 
+  // ... rest of keyboard navigation ...
+
+  return () => {
+    inputRef.current?.removeEventListener('input', handleInput);
+    document.removeEventListener('click', hideSuggestions);
+  };
+};
   /* ------------------------------------------------------------------ */
   /* ITEM ROWS */
   /* ------------------------------------------------------------------ */
@@ -333,6 +504,7 @@ const Purchase = () => {
     const setItems = isEdit ? setEditPurchaseItems : setPurchaseItems;
     setItems(prev => [...prev, newItem]);
 
+    // Setup autocomplete after render
     setTimeout(() => {
       const input = document.getElementById(`${isEdit ? 'edit' : 'add'}-product-input-${id}`);
       if (input) {
@@ -349,7 +521,7 @@ const Purchase = () => {
   };
 
   const recalculateAll = (items, setItems) => {
-    setItems(items.map(i => ({ ...i, total: calculateRowTotal(i) })));
+    setItems(items.map(i => ({ ...i, total: calcRowTotal(i) })));
   };
 
   const getFinalTotal = (items) => {
@@ -414,7 +586,7 @@ const Purchase = () => {
       cid: user.cid
     };
     if (!data.name) {
-      showToast('Vendor name is required');
+      showToast('Vendor name is required', true);
       return;
     }
     try {
@@ -444,10 +616,10 @@ const Purchase = () => {
         addItemRow(false);
         showToast('Vendor added successfully');
       } else {
-        showToast(result.message || 'Failed to add vendor');
+        showToast(result.message || 'Failed to add vendor', true);
       }
     } catch (err) {
-      showToast('Failed to add vendor');
+      showToast('Failed to add vendor', true);
     }
   };
 
@@ -461,8 +633,8 @@ const Purchase = () => {
     const paidAmount = parseFloat(document.getElementById('purchasePaidAmount').value) || 0;
     const absoluteDiscount = parseFloat(document.getElementById('purchaseAbsoluteDiscount').value) || 0;
 
-    if (!selectedVendor.id) return showToast('Please select a vendor');
-    if (!dateTime) return showToast('Please select date and time');
+    if (!selectedVendor.id) return showToast('Please select a vendor', true);
+    if (!dateTime) return showToast('Please select date and time', true);
 
     const products = purchaseItems
       .filter(p => p.product_id && p.quantity > 0 && p.unit_id)
@@ -476,7 +648,7 @@ const Purchase = () => {
         gst: parseFloat(p.gst).toFixed(2)
       }));
 
-    if (products.length === 0) return showToast('Add at least one valid product');
+    if (products.length === 0) return showToast('Add at least one valid product', true);
 
     const payload = {
       products,
@@ -508,10 +680,10 @@ const Purchase = () => {
         setSelectedVendor({ id: '', name: '' });
         fetchPurchases();
       } else {
-        showToast(result.message || 'Failed to save');
+        showToast(result.message || 'Failed to save', true);
       }
     } catch (err) {
-      showToast('Failed to save purchase');
+      showToast('Failed to save purchase', true);
     }
   };
 
@@ -562,8 +734,9 @@ const Purchase = () => {
       setEditPurchaseItems(items.length > 0 ? items : [createEmptyItem()]);
       setShowEditPurchase(true);
 
-      items.forEach(item => {
-        setTimeout(() => {
+      // Setup autocomplete and load units after render
+      setTimeout(() => {
+        items.forEach(item => {
           const input = document.getElementById(`edit-product-input-${item.id}`);
           if (input) {
             const ref = { current: input };
@@ -571,13 +744,13 @@ const Purchase = () => {
             setupAutocomplete(item.id, ref, true);
             const row = input.closest('tr');
             if (row && item.product_id) {
-              handleProductSelection(row, item.product_id, setEditPurchaseItems, item.id);
+              handleProductSelection(row, item.product_id, setEditPurchaseItems, item.id, showToast);
             }
           }
-        }, 100);
-      });
+        });
+      }, 150);
     } catch (err) {
-      showToast('Failed to load purchase');
+      showToast('Failed to load purchase', true);
     }
   };
 
@@ -600,7 +773,7 @@ const Purchase = () => {
         gst: parseFloat(p.gst).toFixed(2)
       }));
 
-    if (products.length === 0) return showToast('Add at least one valid product');
+    if (products.length === 0) return showToast('Add at least one valid product', true);
 
     const payload = {
       bill_name: editForm.billName,
@@ -629,10 +802,10 @@ const Purchase = () => {
         fetchPurchases();
         setDetailsCache(prev => ({ ...prev, [editTransactionId]: null }));
       } else {
-        showToast(result.message || 'Failed to update');
+        showToast(result.message || 'Failed to update', true);
       }
     } catch (err) {
-      showToast('Failed to update');
+      showToast('Failed to update', true);
     }
   };
 
@@ -647,7 +820,7 @@ const Purchase = () => {
       showToast('Purchase deleted');
       fetchPurchases();
     } catch (err) {
-      showToast('Failed to delete');
+      showToast('Failed to delete', true);
     }
   };
 
@@ -688,6 +861,13 @@ const Purchase = () => {
   /* ------------------------------------------------------------------ */
   return (
     <>
+      {/* Toast */}
+      {toast.show && (
+        <div className={`fixed bottom-4 right-4 px-6 py-3 rounded-md shadow-lg z-50 text-white ${toast.error ? 'bg-red-600' : 'bg-green-600'}`}>
+          {toast.msg}
+        </div>
+      )}
+
       {/* Simple Navbar – No Effects */}
       <div className="bg-gradient-to-r from-neutral-800 to-cyan-700 text-white">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
@@ -1029,7 +1209,7 @@ const Purchase = () => {
                     <tbody>
                       {purchaseItems.map(item => (
                         <tr key={`add-item-${item.id}`} data-row-id={item.id}>
-                          <td className="p-1">
+                          <td className="p-1 relative">
                             <input
                               id={`add-product-input-${item.id}`}
                               type="text"
@@ -1040,15 +1220,15 @@ const Purchase = () => {
                               ))}
                               className="w-full p-1 border rounded text-sm"
                             />
-                            <input type="hidden" id={`add-product-id-${item.id}`} />
-                            <div id={`add-suggestions-${item.id}`} className="border rounded mt-1 max-h-32 overflow-y-auto"></div>
+                            <input type="hidden" id={`add-product-id-${item.id}`} value={item.product_id} />
+                            <div id={`add-suggestions-${item.id}`} className="absolute z-10 bg-white border rounded mt-1 max-h-32 overflow-y-auto w-full hidden"></div>
                           </td>
                           <td className="p-1">
                             <input
                               type="number"
                               step="0.01"
                               value={item.quantity}
-                              onChange={e => setPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity: parseFloat(e.target.value) || 0, total: calculateRowTotal({ ...i, quantity: parseFloat(e.target.value) || 0 }) } : i))}
+                              onChange={e => setPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, quantity: parseFloat(e.target.value) || 0 }) } : i))}
                               className="w-16 p-1 border rounded"
                             />
                           </td>
@@ -1058,7 +1238,7 @@ const Purchase = () => {
                               value={item.unit_id}
                               onChange={(e) => setPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, unit_id: e.target.value } : i))}
                             >
-                              <option value="">Select</option>
+                              <option value="">Select Unit</option>
                             </select>
                           </td>
                           <td className="p-1">
@@ -1066,7 +1246,7 @@ const Purchase = () => {
                               type="number"
                               className="purchase-discount w-16 p-1 border rounded"
                               value={item.discount}
-                              onChange={e => setPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, discount: parseFloat(e.target.value) || 0, total: calculateRowTotal({ ...i, discount: parseFloat(e.target.value) || 0 }) } : i))}
+                              onChange={e => setPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, discount: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, discount: parseFloat(e.target.value) || 0 }) } : i))}
                             />
                           </td>
                           <td className="p-1">
@@ -1074,7 +1254,7 @@ const Purchase = () => {
                               type="number"
                               className="purchase-gst w-16 p-1 border rounded"
                               value={item.gst}
-                              onChange={e => setPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, gst: parseFloat(e.target.value) || 0, total: calculateRowTotal({ ...i, gst: parseFloat(e.target.value) || 0 }) } : i))}
+                              onChange={e => setPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, gst: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, gst: parseFloat(e.target.value) || 0 }) } : i))}
                             />
                           </td>
                           <td className="p-1">
@@ -1083,7 +1263,7 @@ const Purchase = () => {
                               step="0.01"
                               className="purchase-cost w-full p-1 border rounded"
                               value={item.per_item_cost}
-                              onChange={e => setPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, per_item_cost: parseFloat(e.target.value) || 0, total: calculateRowTotal({ ...i, per_item_cost: parseFloat(e.target.value) || 0 }) } : i))}
+                              onChange={e => setPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, per_item_cost: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, per_item_cost: parseFloat(e.target.value) || 0 }) } : i))}
                             />
                           </td>
                           <td className="p-1">
@@ -1125,7 +1305,7 @@ const Purchase = () => {
                 <div className="flex gap-2">
                   <button type="submit" className="flex-1 bg-cyan-600 text-white py-2 rounded">Save Purchase</button>
                   <button type="button" onClick={() => { setShowAddPurchase(false); setPurchaseItems([]); }} className="flex-1 bg-gray-300 py-2 rounded">Cancel</button>
-               </div>
+                </div>
               </div>
             </form>
           </div>
@@ -1138,13 +1318,27 @@ const Purchase = () => {
           <div className="bg-white rounded-lg max-w-6xl w-full max-h-screen overflow-y-auto">
             <div className="p-4 border-b flex justify-between items-center">
               <h2 className="text-xl font-bold">Edit Purchase</h2>
-              <button onClick={() => setShowEditPurchase(false)} className="text-gray-500 hover:text-gray-700"><X /></button>
+              <button onClick={() => { 
+                setShowEditPurchase(false); 
+                setEditPurchaseItems([]); 
+                editForm.reset();
+              }} className="text-gray-500 hover:text-gray-700"><X /></button>
             </div>
             <div className="p-4 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <input value={editForm.billName} onChange={e => setEditForm(prev => ({ ...prev, billName: e.target.value }))} placeholder="Bill Name" className="px-3 py-2 border rounded" />
+                <input 
+                  value={editForm.billName} 
+                  onChange={e => setEditForm(prev => ({ ...prev, billName: e.target.value }))} 
+                  placeholder="Bill Name" 
+                  className="px-3 py-2 border rounded" 
+                />
                 <input value={selectedVendor.name} readOnly className="px-3 py-2 border rounded bg-gray-50" />
-                <input type="datetime-local" value={editForm.dateTime} onChange={e => setEditForm(prev => ({ ...prev, dateTime: e.target.value }))} className="px-3 py-2 border rounded" />
+                <input 
+                  type="datetime-local" 
+                  value={editForm.dateTime} 
+                  onChange={e => setEditForm(prev => ({ ...prev, dateTime: e.target.value }))} 
+                  className="px-3 py-2 border rounded" 
+                />
               </div>
 
               <div className="overflow-x-auto">
@@ -1165,7 +1359,7 @@ const Purchase = () => {
                   <tbody>
                     {editPurchaseItems.map(item => (
                       <tr key={`edit-item-${item.id}`} data-row-id={item.id}>
-                        <td className="p-1">
+                        <td className="p-1 relative">
                           <input
                             id={`edit-product-input-${item.id}`}
                             type="text"
@@ -1176,15 +1370,15 @@ const Purchase = () => {
                             ))}
                             className="w-full p-1 border rounded text-sm"
                           />
-                          <input type="hidden" id={`edit-product-id-${item.id}`} />
-                          <div id={`edit-suggestions-${item.id}`} className="border rounded mt-1 max-h-32 overflow-y-auto"></div>
+                          <input type="hidden" id={`edit-product-id-${item.id}`} value={item.product_id} />
+                          <div id={`edit-suggestions-${item.id}`} className="absolute z-10 bg-white border rounded mt-1 max-h-32 overflow-y-auto w-full hidden"></div>
                         </td>
                         <td className="p-1">
                           <input
                             type="number"
                             step="0.01"
                             value={item.quantity}
-                            onChange={e => setEditPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity: parseFloat(e.target.value) || 0, total: calculateRowTotal({ ...i, quantity: parseFloat(e.target.value) || 0 }) } : i))}
+                            onChange={e => setEditPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, quantity: parseFloat(e.target.value) || 0 }) } : i))}
                             className="w-16 p-1 border rounded"
                           />
                         </td>
@@ -1194,7 +1388,7 @@ const Purchase = () => {
                             value={item.unit_id}
                             onChange={(e) => setEditPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, unit_id: e.target.value } : i))}
                           >
-                            <option value="">Select</option>
+                            <option value="">Select Unit</option>
                           </select>
                         </td>
                         <td className="p-1">
@@ -1202,7 +1396,7 @@ const Purchase = () => {
                             type="number"
                             className="purchase-discount w-16 p-1 border rounded"
                             value={item.discount}
-                            onChange={e => setEditPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, discount: parseFloat(e.target.value) || 0, total: calculateRowTotal({ ...i, discount: parseFloat(e.target.value) || 0 }) } : i))}
+                            onChange={e => setEditPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, discount: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, discount: parseFloat(e.target.value) || 0 }) } : i))}
                           />
                         </td>
                         <td className="p-1">
@@ -1210,7 +1404,7 @@ const Purchase = () => {
                             type="number"
                             className="purchase-gst w-16 p-1 border rounded"
                             value={item.gst}
-                            onChange={e => setEditPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, gst: parseFloat(e.target.value) || 0, total: calculateRowTotal({ ...i, gst: parseFloat(e.target.value) || 0 }) } : i))}
+                            onChange={e => setEditPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, gst: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, gst: parseFloat(e.target.value) || 0 }) } : i))}
                           />
                         </td>
                         <td className="p-1">
@@ -1219,7 +1413,7 @@ const Purchase = () => {
                             step="0.01"
                             className="purchase-cost w-full p-1 border rounded"
                             value={item.per_item_cost}
-                            onChange={e => setEditPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, per_item_cost: parseFloat(e.target.value) || 0, total: calculateRowTotal({ ...i, per_item_cost: parseFloat(e.target.value) || 0 }) } : i))}
+                            onChange={e => setEditPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, per_item_cost: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, per_item_cost: parseFloat(e.target.value) || 0 }) } : i))}
                           />
                         </td>
                         <td className="p-1">
@@ -1246,16 +1440,33 @@ const Purchase = () => {
                 <button type="button" onClick={() => recalculateAll(editPurchaseItems, setEditPurchaseItems)} className="bg-yellow-500 text-white px-3 py-1 rounded text-sm flex items-center gap-1"><Calculator className="w-4 h-4" /> Calculate</button>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-                <div><strong>Final Total:</strong> {getCurrencySymbol()}{editTotals.subtotal}</div>
-                <input type="number" step="0.01" value={editForm.absoluteDiscount} onChange={e => setEditForm(prev => ({ ...prev, absoluteDiscount: parseFloat(e.target.value) || 0 }))} placeholder="Abs. Discount" className="p-2 border rounded" />
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
+                <div><strong>Subtotal:</strong> {getCurrencySymbol()}{editTotals.subtotal}</div>
+                <input 
+                  type="number" 
+                  step="0.01" 
+                  value={editForm.absoluteDiscount} 
+                  onChange={e => setEditForm(prev => ({ ...prev, absoluteDiscount: parseFloat(e.target.value) || 0 }))} 
+                  placeholder="Abs. Discount" 
+                  className="p-2 border rounded" 
+                />
                 <div><strong>Payable:</strong> {getCurrencySymbol()}{editTotals.payable}</div>
-                <div><strong>Paid (Orig):</strong> {getCurrencySymbol()}{editOriginalPaidAmount.toFixed(2)}</div>
-                <input type="number" step="0.01" value={editForm.setPaidAmount} onChange={e => setEditForm(prev => ({ ...prev, setPaidAmount: parseFloat(e.target.value) || 0 }))} placeholder="Paid Adj." className="p-2 border rounded" />
+                <input 
+                  type="number" 
+                  step="0.01" 
+                  value={editForm.setPaidAmount} 
+                  onChange={e => setEditForm(prev => ({ ...prev, setPaidAmount: parseFloat(e.target.value) || 0 }))} 
+                  placeholder="Paid Adj." 
+                  className="p-2 border rounded" 
+                />
                 <div><strong>Due:</strong> {getCurrencySymbol()}{editTotals.due}</div>
               </div>
 
-              <select value={editForm.paymentMode} onChange={e => setEditForm(prev => ({ ...prev, paymentMode: e.target.value }))} className="w-full md:w-64 p-2 border rounded">
+              <select 
+                value={editForm.paymentMode} 
+                onChange={e => setEditForm(prev => ({ ...prev, paymentMode: e.target.value }))} 
+                className="w-full md:w-64 p-2 border rounded"
+              >
                 {Object.keys(paymentModeMap).map(m => <option key={m} value={m}>{m.replace('_', ' ')}</option>)}
               </select>
 
@@ -1265,13 +1476,6 @@ const Purchase = () => {
               </div>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Toast */}
-      {toast.show && (
-        <div className="fixed bottom-4 right-4 bg-green-600 text-white px-6 py-3 rounded-md shadow-lg z-50">
-          {toast.message}
         </div>
       )}
     </>
