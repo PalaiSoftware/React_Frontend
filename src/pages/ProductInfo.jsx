@@ -12,8 +12,9 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import Header from '../components/Header';
+import { API_BASE_URL } from '../config';
 
-const API_BASE_URL = 'http://127.0.0.1:8000/api'; // Change if needed
+//const API_BASE_URL = 'http://127.0.0.1:8000/api'; // Change if needed
 
 export default function ProductInfo() {
   const [user, setUser] = useState(null);

@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 import Card from "../components/Card"; // Reusable Card component
 import { FaArrowRight, FaUserCircle } from "react-icons/fa";
 import Header from "../components/Header";
+import { API_BASE_URL } from "../config";
 
-const API_BASE_URL = "http://127.0.0.1:8000/api"; // or your backend URL
+//const API_BASE_URL = "http://127.0.0.1:8000/api"; // or your backend URL
 
 export default function Dashboard() {
   const navigate = useNavigate();

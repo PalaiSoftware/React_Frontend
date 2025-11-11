@@ -13,8 +13,9 @@ import {
   FaArrowUp,
   FaArrowDown,
 } from "react-icons/fa";
+import { API_BASE_URL } from "../config";
 
-const API_BASE_URL = "http://127.0.0.1:8000/api";
+//const API_BASE_URL = "http://127.0.0.1:8000/api";
 const ITEMS_PER_PAGE = 50;
 const roleMap = {
   1: "Admin",

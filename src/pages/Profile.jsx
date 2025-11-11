@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
+import { API_BASE_URL} from "../config";
 
 const defaultUserFallback = {
   id: 2,
@@ -67,7 +68,7 @@ export default function Profile() {
   const [showNewPwd, setShowNewPwd] = useState(false);
   const [showConfirmPwd, setShowConfirmPwd] = useState(false);
 
-  const API_BASE = "http://127.0.0.1:8000/api"; // safe fallback
+  //const API_BASE_URL = "http://127.0.0.1:8000/api"; // safe fallback
   const canAccessUserProfile = [1, 2, 3, 4, 5].includes(user?.rid);
   const canAccessCompanyProfile = [1, 2, 3].includes(user?.rid);
 
@@ -96,7 +97,7 @@ export default function Profile() {
   // API functions
   async function fetchUserDetails(userId) {
     try {
-      const resp = await fetch(`${API_BASE}/user/${userId}`, {
+      const resp = await fetch(`${API_BASE_URL}/user/${userId}`, {
         headers: { Authorization: `Bearer ${getAuthToken()}` },
       });
       const data = await resp.json();
@@ -109,7 +110,7 @@ export default function Profile() {
 
   async function fetchCompanyDetails(cid) {
     try {
-      const resp = await fetch(`${API_BASE}/clients/${cid}`, {
+      const resp = await fetch(`${API_BASE_URL}/clients/${cid}`, {
         headers: { Authorization: `Bearer ${getAuthToken()}` },
       });
       const data = await resp.json();
@@ -122,7 +123,7 @@ export default function Profile() {
 
   async function updateUserDetailsAPI(userId, updatedData) {
     try {
-      const resp = await fetch(`${API_BASE}/user/${userId}`, {
+      const resp = await fetch(`${API_BASE_URL}/user/${userId}`, {
         method: "PUT",
         headers: {
           Authorization: `Bearer ${getAuthToken()}`,
@@ -139,7 +140,7 @@ export default function Profile() {
 
   async function updateCompanyDetailsAPI(cid, updatedData) {
     try {
-      const resp = await fetch(`${API_BASE}/clients/${cid}`, {
+      const resp = await fetch(`${API_BASE_URL}/clients/${cid}`, {
         method: "PUT",
         headers: {
           Authorization: `Bearer ${getAuthToken()}`,
@@ -163,7 +164,7 @@ export default function Profile() {
 
   async function changePasswordAPI(userId, data) {
     try {
-      const resp = await fetch(`${API_BASE}/change-password/${userId}`, {
+      const resp = await fetch(`${API_BASE_URL}/change-password/${userId}`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${getAuthToken()}`,

@@ -4,10 +4,10 @@ import { FaEdit, FaSave, FaTimes, FaSearch, FaPlus } from "react-icons/fa";
 import { MdAddCircle } from "react-icons/md";
 import { GrUpdate } from "react-icons/gr";
 import Header from "../components/Header";
+import { API_BASE_URL } from "../config";
 
 
-
-const API_BASE_URL = "http://127.0.0.1:8000/api";
+//const API_BASE_URL = "http://127.0.0.1:8000/api";
 
 export default function Customer() {
   const [customers, setCustomers] = useState([]);

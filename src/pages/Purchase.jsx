@@ -4,8 +4,9 @@ import {
   Edit as EditIcon, Trash2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../config';
 
-const API_BASE_URL = "http://127.0.0.1:8000/api";
+//const API_BASE_URL = "http://127.0.0.1:8000/api";
 
 const paymentModeMap = {
   credit_card: 1, debit_card: 2, cash: 3, upi: 4, bank_transfer: 5, phonepe: 6

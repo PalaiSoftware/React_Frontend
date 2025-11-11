@@ -2,8 +2,9 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
 import Header from "../components/Header";
+import { API_BASE_URL } from "../config";
 
-const API_BASE_URL = "http://127.0.0.1:8000/api";
+//const API_BASE_URL = "http://127.0.0.1:8000/api";
 const ITEMS_PER_PAGE = 50;
 
 export default function DueRecord() {
