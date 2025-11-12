@@ -43,12 +43,7 @@ function App() {
 <Route path="/inventory/sales" element={<Sales />} />
 <Route path="/inventory/purchase" element={<Purchase />} />
 <Route path="/management/user" element={<User />} />
-
 <Route path="/profile" element={<Profile />} />
-
-
-
-
 
         </Route>
       </Routes>

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
-import { API_BASE_URL} from "../config";
+import { API_BASE_URL } from "../config";
 
 const defaultUserFallback = {
   id: 2,
@@ -68,7 +68,6 @@ export default function Profile() {
   const [showNewPwd, setShowNewPwd] = useState(false);
   const [showConfirmPwd, setShowConfirmPwd] = useState(false);
 
-  //const API_BASE_URL = "http://127.0.0.1:8000/api"; // safe fallback
   const canAccessUserProfile = [1, 2, 3, 4, 5].includes(user?.rid);
   const canAccessCompanyProfile = [1, 2, 3].includes(user?.rid);
 
@@ -205,8 +204,21 @@ export default function Profile() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Helper: status styling
   const statusClass = (s) =>
     s === "active" ? "text-green-600 font-semibold" : "text-red-600 font-semibold";
+
+  // Helper: map rid → readable role
+  const getRoleLabel = (rid) => {
+    const map = {
+      1: "Admin",
+      2: "Moderator",
+      3: "Authenticated",
+      4: "Anonymous",
+      5: "Guest",
+    };
+    return map[rid] || "Unknown";
+  };
 
   // Handlers
   async function handleUserSave(e) {
@@ -270,10 +282,9 @@ export default function Profile() {
       {/* USER PROFILE */}
       {canAccessUserProfile ? (
         <div className="bg-white p-6 rounded-lg shadow mb-6">
-            <h3 className="text-lg font-semibold text-slate-700 mb-1">
-              User Profile
-            </h3>
-    
+          <h3 className="text-lg font-semibold text-slate-700 mb-1">
+            User Profile
+          </h3>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm mt-4">
             <p>
@@ -288,6 +299,15 @@ export default function Profile() {
             <p>
               <strong>Country:</strong> {user.country}
             </p>
+
+            {/* NEW: Role Field */}
+            <p>
+              <strong>Role:</strong>{" "}
+              <span className="capitalize font-medium text-indigo-600">
+                {user.role?.toLowerCase() || getRoleLabel(user.rid)}
+              </span>
+            </p>
+
             <p>
               <strong>Status:</strong>{" "}
               <span className={statusClass(user.user_status)}>
@@ -295,7 +315,8 @@ export default function Profile() {
               </span>
             </p>
           </div>
-              <div className="flex flex-wrap justify-center sm:justify-end gap-2 mt-2">
+
+          <div className="flex flex-wrap justify-center sm:justify-end gap-2 mt-2">
             <button
               onClick={() => setShowChangePassword(true)}
               className="px-2.5 py-1 border border-yellow-500 text-yellow-500 rounded text-xs sm:text-sm hover:bg-yellow-500 hover:text-white transition-all"
@@ -328,10 +349,18 @@ export default function Profile() {
               Company Profile
             </h3>
             <button
-              onClick={() => {
-                setEditCompanyData(company);
-                setShowEditCompany(true);
-              }}
+             onClick={() => {
+  setEditCompanyData({
+    name: company.name || "",
+    phone: company.phone || "",
+    gst: company.gst_no || "",   // ✅ map gst_no → gst
+    pan: company.pan || "",
+    address: company.address || "",
+    company_status: company.company_status || "active",
+  });
+  setShowEditCompany(true);
+}}
+
               className="px-3 py-1 border border-cyan-800 text-cyan-800 rounded text-sm hover:bg-cyan-800 hover:text-white"
             >
               Edit
@@ -478,17 +507,28 @@ export default function Profile() {
                 show: showConfirmPwd,
                 set: setShowConfirmPwd,
               },
-            ].map(({ key, label, show}) => (
-              <input
-                key={key}
-                type={show ? "text" : "password"}
-                className="w-full border p-2 rounded"
-                placeholder={label}
-                value={passwordForm[key] || ""}
-                onChange={(e) =>
-                  setPasswordForm({ ...passwordForm, [key]: e.target.value })
-                }
-              />
+            ].map(({ key, label }) => (
+              <div key={key} className="relative">
+                <input
+                  type={passwordForm[`show${key}`] ? "text" : "password"}
+                  className="w-full border p-2 pr-10 rounded"
+                  placeholder={label}
+                  value={passwordForm[key] || ""}
+                  onChange={(e) =>
+                    setPasswordForm({ ...passwordForm, [key]: e.target.value })
+                  }
+                />
+                <button
+                  type="button"
+                  onClick={() => setPasswordForm((prev) => ({
+                    ...prev,
+                    [`show${key}`]: !prev[`show${key}`],
+                  }))}
+                  className="absolute inset-y-0 right-2 flex items-center text-gray-500"
+                >
+                  {passwordForm[`show${key}`] ? "Hide" : "Show"}
+                </button>
+              </div>
             ))}
             <div className="flex justify-end gap-2 mt-3">
               <button
