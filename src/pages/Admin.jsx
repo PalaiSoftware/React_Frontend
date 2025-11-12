@@ -3,8 +3,9 @@ import { useEffect, useState, useCallback } from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import React from "react";
+import { API_BASE_URL } from "../config";
 
-const API_BASE_URL = "http://127.0.0.1:8000/api";
+//const API_BASE_URL = "http://127.0.0.1:8000/api";
 const PER_PAGE = 10;
 const allowedRids = [1, 2, 3];
 

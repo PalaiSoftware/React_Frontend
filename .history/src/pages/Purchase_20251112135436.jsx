@@ -175,6 +175,8 @@ const Purchase = () => {
   const [detailsCache, setDetailsCache] = useState({});
   const [openDetails, setOpenDetails] = useState({});
   const [vendorSearchResults, setVendorSearchResults] = useState([]);
+
+  // Updated editForm to include originalPaid
   const [editForm, setEditForm] = useState({
     billName: '',
     dateTime: '',
@@ -183,6 +185,7 @@ const Purchase = () => {
     setPaidAmount: 0,
     originalPaid: 0
   });
+
   const [addTotals, setAddTotals] = useState({ subtotal: 0, payable: 0, due: 0 });
   const [editTotals, setEditTotals] = useState({ subtotal: 0, payable: 0, due: 0, totalPaid: 0 });
   const itemsPerPage = 50;
@@ -307,35 +310,22 @@ const Purchase = () => {
   const totalPages = Math.ceil(filteredPurchases.length / itemsPerPage);
 
   /* ------------------------------------------------------------------ */
-  /* AUTOCOMPLETE SETUP - FIXED POSITIONING */
+  /* AUTOCOMPLETE SETUP */
   /* ------------------------------------------------------------------ */
   const setupAutocomplete = (rowId, inputRef, isEdit = false) => {
     const suggestionsContainer = document.getElementById(`${isEdit ? 'edit' : 'add'}-suggestions-${rowId}`);
     if (!suggestionsContainer || !inputRef.current) return;
-
-    const updatePosition = () => {
-      const input = inputRef.current;
-      const rect = input.getBoundingClientRect();
-      suggestionsContainer.style.top = `${rect.bottom + window.scrollY}px`;
-      suggestionsContainer.style.left = `${rect.left + window.scrollX}px`;
-      suggestionsContainer.style.width = `${rect.width}px`;
-      suggestionsContainer.style.pointerEvents = 'auto';
-    };
-
+    const row = inputRef.current.closest('tr');
     const handleInput = debounce(() => {
       const query = inputRef.current.value.trim().toLowerCase();
       suggestionsContainer.innerHTML = '';
-      suggestionsContainer.classList.add('hidden');
-
+      suggestionsContainer.style.display = 'none';
       if (query.length < 2) return;
-
       const filteredProducts = allProducts.filter(product =>
         (product.product_name && product.product_name.toLowerCase().includes(query)) ||
         (product.hscode && product.hscode.toLowerCase().includes(query))
       ).slice(0, 12);
-
       if (filteredProducts.length === 0) return;
-
       filteredProducts.forEach(product => {
         const suggestion = document.createElement('div');
         suggestion.textContent = product.product_name;
@@ -346,45 +336,28 @@ const Purchase = () => {
           const hiddenInput = document.getElementById(`${isEdit ? 'edit' : 'add'}-product-id-${rowId}`);
           if (hiddenInput) hiddenInput.value = product.id;
           suggestionsContainer.innerHTML = '';
-          suggestionsContainer.classList.add('hidden');
+          suggestionsContainer.style.display = 'none';
           const setItems = isEdit ? setEditPurchaseItems : setPurchaseItems;
           setItems(prev => prev.map(i =>
             i.id === rowId ? { ...i, product_id: product.id, product_name: product.product_name } : i
           ));
-          const row = inputRef.current.closest('tr');
           if (row) {
             await handleProductSelection(row, product.id, setItems, rowId, showToast);
           }
         });
         suggestionsContainer.appendChild(suggestion);
       });
-
-      suggestionsContainer.classList.remove('hidden');
-      updatePosition();
+      suggestionsContainer.style.display = 'block';
     }, 300);
-
+    inputRef.current.addEventListener('input', handleInput);
     const hideSuggestions = (e) => {
-      if (!inputRef.current.contains(e.target) && !suggestionsContainer.contains(e.target)) {
-        suggestionsContainer.classList.add('hidden');
+      if (row && !row.contains(e.target)) {
+        suggestionsContainer.style.display = 'none';
       }
     };
-
-    inputRef.current.addEventListener('input', handleInput);
-    inputRef.current.addEventListener('focus', () => {
-      if (suggestionsContainer.children.length > 0) {
-        suggestionsContainer.classList.remove('hidden');
-        updatePosition();
-      }
-    });
-    window.addEventListener('scroll', updatePosition);
-    window.addEventListener('resize', updatePosition);
     document.addEventListener('click', hideSuggestions);
-
     return () => {
       inputRef.current?.removeEventListener('input', handleInput);
-      inputRef.current?.removeEventListener('focus', () => {});
-      window.removeEventListener('scroll', updatePosition);
-      window.removeEventListener('resize', updatePosition);
       document.removeEventListener('click', hideSuggestions);
     };
   };
@@ -984,7 +957,7 @@ const Purchase = () => {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="p-4 border-t flex justify-between items- center">
+            <div className="p-4 border-t flex justify-between items-center">
               <button
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
@@ -1148,134 +1121,121 @@ const Purchase = () => {
                 </div>
               </div>
 
-              {/* PRODUCT TABLE - ADD */}
               <div className="border rounded-md overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[800px]">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-3 py-2 text-left text-xs font-medium">Product</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium">Qty</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium">Unit</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium">Cost</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium">GST %</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium">Sell Price</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium">Disc %</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium">Total</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {purchaseItems.map(item => (
-                        <tr key={item.id}>
-                          <td className="p-1">
-                            <div className="relative">
-                              <input
-                                id={`add-product-input-${item.id}`}
-                                type="text"
-                                placeholder="Search product..."
-                                className="w-full px-2 py-1 text-xs border rounded"
-                              />
-                              <input type="hidden" id={`add-product-id-${item.id}`} />
-                            </div>
-                          </td>
-                          <td className="p-1">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-medium">Product</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium">Qty</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium">Unit</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium">Cost</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium">GST %</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium">Sell Price</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium">Disc %</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium">Total</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {purchaseItems.map(item => (
+                      <tr key={item.id}>
+                        <td className="p-1">
+                          <div className="relative">
                             <input
-                              type="number"
-                              step="0.001"
-                              value={item.quantity}
-                              onChange={(e) => {
-                                const qty = parseFloat(e.target.value) || 0;
-                                setPurchaseItems(prev => prev.map(i =>
-                                  i.id === item.id ? { ...i, quantity: qty, total: calcRowTotal({ ...i, quantity: qty }) } : i
-                                ));
-                              }}
+                              id={`add-product-input-${item.id}`}
+                              type="text"
+                              placeholder="Search product..."
                               className="w-full px-2 py-1 text-xs border rounded"
                             />
-                          </td>
-                          <td className="p-1">
-                            <select className="purchase-unit w-full px-2 py-1 text-xs border rounded">
-                              <option value="">Select Unit</option>
-                            </select>
-                          </td>
-                          <td className="p-1">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={item.per_item_cost}
-                              onChange={(e) => {
-                                const cost = parseFloat(e.target.value) || 0;
-                                setPurchaseItems(prev => prev.map(i =>
-                                  i.id === item.id ? { ...i, per_item_cost: cost, total: calcRowTotal({ ...i, per_item_cost: cost }) } : i
-                                ));
-                              }}
-                              className="purchase-cost w-full px-2 py-1 text-xs border rounded"
-                            />
-                          </td>
-                          <td className="p-1">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={item.gst}
-                              onChange={(e) => {
-                                const gst = parseFloat(e.target.value) || 0;
-                                setPurchaseItems(prev => prev.map(i =>
-                                  i.id === item.id ? { ...i, gst, total: calcRowTotal({ ...i, gst }) } : i
-                                ));
-                              }}
-                              className="purchase-gst w-full px-2 py-1 text-xs border rounded"
-                            />
-                          </td>
-                          <td className="p-1">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={item.selling_price}
-                              onChange={(e) => {
-                                const sp = parseFloat(e.target.value) || 0;
-                                setPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, selling_price: sp } : i));
-                              }}
-                              className="purchase-selling-price w-full px-2 py-1 text-xs border rounded"
-                            />
-                          </td>
-                          <td className="p-1">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={item.discount}
-                              onChange={(e) => {
-                                const disc = parseFloat(e.target.value) || 0;
-                                setPurchaseItems(prev => prev.map(i =>
-                                  i.id === item.id ? { ...i, discount: disc, total: calcRowTotal({ ...i, discount: disc }) } : i
-                                ));
-                              }}
-                              className="purchase-discount w-full px-2 py-1 text-xs border rounded"
-                            />
-                          </td>
-                          <td className="p-1 text-xs font-medium">
-                            {getCurrencySymbol()}{item.total.toFixed(2)}
-                          </td>
-                          <td className="p-1">
-                            <button onClick={() => removeItem(item.id, false)} className="text-red-600 hover:text-red-800">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* SUGGESTIONS PORTAL - ADD */}
-                {purchaseItems.map(item => (
-                  <div
-                    key={`add-suggestions-portal-${item.id}`}
-                    id={`add-suggestions-${item.id}`}
-                    className="fixed bg-white border shadow-lg rounded-md mt-1 w-64 z-50 hidden max-h-48 overflow-y-auto"
-                    style={{ pointerEvents: 'none' }}
-                  />
-                ))}
-
+                            <input type="hidden" id={`add-product-id-${item.id}`} />
+                            <div id={`add-suggestions-${item.id}`} className="absolute z-10 bg-white border mt-1 w-full shadow-lg hidden"></div>
+                          </div>
+                        </td>
+                        <td className="p-1">
+                          <input
+                            type="number"
+                            step="0.001"
+                            value={item.quantity}
+                            onChange={(e) => {
+                              const qty = parseFloat(e.target.value) || 0;
+                              setPurchaseItems(prev => prev.map(i =>
+                                i.id === item.id ? { ...i, quantity: qty, total: calcRowTotal({ ...i, quantity: qty }) } : i
+                              ));
+                            }}
+                            className="w-full px-2 py-1 text-xs border rounded"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <select className="purchase-unit w-full px-2 py-1 text-xs border rounded">
+                            <option value="">Select Unit</option>
+                          </select>
+                        </td>
+                        <td className="p-1">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={item.per_item_cost}
+                            onChange={(e) => {
+                              const cost = parseFloat(e.target.value) || 0;
+                              setPurchaseItems(prev => prev.map(i =>
+                                i.id === item.id ? { ...i, per_item_cost: cost, total: calcRowTotal({ ...i, per_item_cost: cost }) } : i
+                              ));
+                            }}
+                            className="purchase-cost w-full px-2 py-1 text-xs border rounded"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={item.gst}
+                            onChange={(e) => {
+                              const gst = parseFloat(e.target.value) || 0;
+                              setPurchaseItems(prev => prev.map(i =>
+                                i.id === item.id ? { ...i, gst, total: calcRowTotal({ ...i, gst }) } : i
+                              ));
+                            }}
+                            className="purchase-gst w-full px-2 py-1 text-xs border rounded"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={item.selling_price}
+                            onChange={(e) => {
+                              const sp = parseFloat(e.target.value) || 0;
+                              setPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, selling_price: sp } : i));
+                            }}
+                            className="purchase-selling-price w-full px-2 py-1 text-xs border rounded"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={item.discount}
+                            onChange={(e) => {
+                              const disc = parseFloat(e.target.value) || 0;
+                              setPurchaseItems(prev => prev.map(i =>
+                                i.id === item.id ? { ...i, discount: disc, total: calcRowTotal({ ...i, discount: disc }) } : i
+                              ));
+                            }}
+                            className="purchase-discount w-full px-2 py-1 text-xs border rounded"
+                          />
+                        </td>
+                        <td className="p-1 text-xs font-medium">
+                          {getCurrencySymbol()}{item.total.toFixed(2)}
+                        </td>
+                        <td className="p-1">
+                          <button onClick={() => removeItem(item.id, false)} className="text-red-600 hover:text-red-800">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
                 <div className="p-3 bg-gray-50 flex justify-between items-center">
                   <button onClick={() => addItemRow(false)} className="text-cyan-600 hover:underline text-sm flex items-center gap-1">
                     <Plus className="w-4 h-4" /> Add Item
@@ -1383,135 +1343,122 @@ const Purchase = () => {
                 </div>
               </div>
 
-              {/* PRODUCT TABLE - EDIT */}
               <div className="border rounded-md overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[800px]">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-3 py-2 text-left text-xs font-medium">Product</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium">Qty</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium">Unit</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium">Cost</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium">GST %</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium">Sell Price</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium">Disc %</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium">Total</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {editPurchaseItems.map(item => (
-                        <tr key={item.id}>
-                          <td className="p-1">
-                            <div className="relative">
-                              <input
-                                id={`edit-product-input-${item.id}`}
-                                type="text"
-                                placeholder="Search product..."
-                                defaultValue={item.product_name}
-                                className="w-full px-2 py-1 text-xs border rounded"
-                              />
-                              <input type="hidden" id={`edit-product-id-${item.id}`} value={item.product_id} />
-                            </div>
-                          </td>
-                          <td className="p-1">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-medium">Product</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium">Qty</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium">Unit</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium">Cost</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium">GST %</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium">Sell Price</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium">Disc %</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium">Total</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {editPurchaseItems.map(item => (
+                      <tr key={item.id}>
+                        <td className="p-1">
+                          <div className="relative">
                             <input
-                              type="number"
-                              step="0.001"
-                              value={item.quantity}
-                              onChange={(e) => {
-                                const qty = parseFloat(e.target.value) || 0;
-                                setEditPurchaseItems(prev => prev.map(i =>
-                                  i.id === item.id ? { ...i, quantity: qty, total: calcRowTotal({ ...i, quantity: qty }) } : i
-                                ));
-                              }}
+                              id={`edit-product-input-${item.id}`}
+                              type="text"
+                              placeholder="Search product..."
+                              defaultValue={item.product_name}
                               className="w-full px-2 py-1 text-xs border rounded"
                             />
-                          </td>
-                          <td className="p-1">
-                            <select className="purchase-unit w-full px-2 py-1 text-xs border rounded">
-                              <option value="">Select Unit</option>
-                            </select>
-                          </td>
-                          <td className="p-1">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={item.per_item_cost}
-                              onChange={(e) => {
-                                const cost = parseFloat(e.target.value) || 0;
-                                setEditPurchaseItems(prev => prev.map(i =>
-                                  i.id === item.id ? { ...i, per_item_cost: cost, total: calcRowTotal({ ...i, per_item_cost: cost }) } : i
-                                ));
-                              }}
-                              className="purchase-cost w-full px-2 py-1 text-xs border rounded"
-                            />
-                          </td>
-                          <td className="p-1">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={item.gst}
-                              onChange={(e) => {
-                                const gst = parseFloat(e.target.value) || 0;
-                                setEditPurchaseItems(prev => prev.map(i =>
-                                  i.id === item.id ? { ...i, gst, total: calcRowTotal({ ...i, gst }) } : i
-                                ));
-                              }}
-                              className="purchase-gst w-full px-2 py-1 text-xs border rounded"
-                            />
-                          </td>
-                          <td className="p-1">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={item.selling_price}
-                              onChange={(e) => {
-                                const sp = parseFloat(e.target.value) || 0;
-                                setEditPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, selling_price: sp } : i));
-                              }}
-                              className="purchase-selling-price w-full px-2 py-1 text-xs border rounded"
-                            />
-                          </td>
-                          <td className="p-1">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={item.discount}
-                              onChange={(e) => {
-                                const disc = parseFloat(e.target.value) || 0;
-                                setEditPurchaseItems(prev => prev.map(i =>
-                                  i.id === item.id ? { ...i, discount: disc, total: calcRowTotal({ ...i, discount: disc }) } : i
-                                ));
-                              }}
-                              className="purchase-discount w-full px-2 py-1 text-xs border rounded"
-                            />
-                          </td>
-                          <td className="p-1 text-xs font-medium">
-                            {getCurrencySymbol()}{item.total.toFixed(2)}
-                          </td>
-                          <td className="p-1">
-                            <button onClick={() => removeItem(item.id, true)} className="text-red-600 hover:text-red-800">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* SUGGESTIONS PORTAL - EDIT */}
-                {editPurchaseItems.map(item => (
-                  <div
-                    key={`edit-suggestions-portal-${item.id}`}
-                    id={`edit-suggestions-${item.id}`}
-                    className="fixed bg-white border shadow-lg rounded-md mt-1 w-64 z-50 hidden max-h-48 overflow-y-auto"
-                    style={{ pointerEvents: 'none' }}
-                  />
-                ))}
-
+                            <input type="hidden" id={`edit-product-id-${item.id}`} value={item.product_id} />
+                            <div id={`edit-suggestions-${item.id}`} className="absolute z-10 bg-white border mt-1 w-full shadow-lg hidden"></div>
+                          </div>
+                        </td>
+                        <td className="p-1">
+                          <input
+                            type="number"
+                            step="0.001"
+                            value={item.quantity}
+                            onChange={(e) => {
+                              const qty = parseFloat(e.target.value) || 0;
+                              setEditPurchaseItems(prev => prev.map(i =>
+                                i.id === item.id ? { ...i, quantity: qty, total: calcRowTotal({ ...i, quantity: qty }) } : i
+                              ));
+                            }}
+                            className="w-full px-2 py-1 text-xs border rounded"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <select className="purchase-unit w-full px-2 py-1 text-xs border rounded">
+                            <option value="">Select Unit</option>
+                          </select>
+                        </td>
+                        <td className="p-1">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={item.per_item_cost}
+                            onChange={(e) => {
+                              const cost = parseFloat(e.target.value) || 0;
+                              setEditPurchaseItems(prev => prev.map(i =>
+                                i.id === item.id ? { ...i, per_item_cost: cost, total: calcRowTotal({ ...i, per_item_cost: cost }) } : i
+                              ));
+                            }}
+                            className="purchase-cost w-full px-2 py-1 text-xs border rounded"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={item.gst}
+                            onChange={(e) => {
+                              const gst = parseFloat(e.target.value) || 0;
+                              setEditPurchaseItems(prev => prev.map(i =>
+                                i.id === item.id ? { ...i, gst, total: calcRowTotal({ ...i, gst }) } : i
+                              ));
+                            }}
+                            className="purchase-gst w-full px-2 py-1 text-xs border rounded"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={item.selling_price}
+                            onChange={(e) => {
+                              const sp = parseFloat(e.target.value) || 0;
+                              setEditPurchaseItems(prev => prev.map(i => i.id === item.id ? { ...i, selling_price: sp } : i));
+                            }}
+                            className="purchase-selling-price w-full px-2 py-1 text-xs border rounded"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={item.discount}
+                            onChange={(e) => {
+                              const disc = parseFloat(e.target.value) || 0;
+                              setEditPurchaseItems(prev => prev.map(i =>
+                                i.id === item.id ? { ...i, discount: disc, total: calcRowTotal({ ...i, discount: disc }) } : i
+                              ));
+                            }}
+                            className="purchase-discount w-full px-2 py-1 text-xs border rounded"
+                          />
+                        </td>
+                        <td className="p-1 text-xs font-medium">
+                          {getCurrencySymbol()}{item.total.toFixed(2)}
+                        </td>
+                        <td className="p-1">
+                          <button onClick={() => removeItem(item.id, true)} className="text-red-600 hover:text-red-800">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
                 <div className="p-3 bg-gray-50 flex justify-between items-center">
                   <button onClick={() => addItemRow(true)} className="text-cyan-600 hover:underline text-sm flex items-center gap-1">
                     <Plus className="w-4 h-4" /> Add Item
