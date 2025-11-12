@@ -14,8 +14,6 @@ import {
 import Header from '../components/Header';
 import { API_BASE_URL } from '../config';
 
-//const API_BASE_URL = 'http://127.0.0.1:8000/api'; // Change if needed
-
 export default function ProductInfo() {
   const [user, setUser] = useState(null);
   const [authToken, setAuthToken] = useState(null);
@@ -143,13 +141,13 @@ export default function ProductInfo() {
         p.hsn_code.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    // 0 → 1-10 → rest, then alphabetical
     filtered.sort((a, b) => {
       const sa = parseInt(a.current_stock) || 0;
       const sb = parseInt(b.current_stock) || 0;
-      const lowA = sa <= 10;
-      const lowB = sb <= 10;
-      if (lowA && !lowB) return -1;
-      if (!lowA && lowB) return 1;
+      const ga = sa === 0 ? 0 : sa <= 10 ? 1 : 2;
+      const gb = sb === 0 ? 0 : sb <= 10 ? 1 : 2;
+      if (ga !== gb) return ga - gb;
       return a.name.localeCompare(b.name);
     });
 
@@ -161,6 +159,14 @@ export default function ProductInfo() {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
+
+  /* ---------- Colour helper ---------- */
+  const getStockColor = (stock) => {
+    const v = parseInt(stock) || 0;
+    if (v === 0) return 'text-[#c11b17] font-bold';
+    if (v > 0 && v <= 10) return 'text-[#f88017] font-bold';
+    return 'text-gray-700';
+  };
 
   /* ---------- Edit Helpers ---------- */
   const startEdit = (p) => {
@@ -267,7 +273,7 @@ export default function ProductInfo() {
             </div>
           </div>
 
-          {/* ------------------- Desktop Table (Fixed Width) ------------------- */}
+          {/* ------------------- Desktop Table ------------------- */}
           <div className="hidden overflow-x-auto rounded-lg bg-white shadow lg:block">
             <table className="min-w-full table-fixed divide-y divide-gray-200">
               <thead className="bg-gray-50">
@@ -321,33 +327,20 @@ export default function ProductInfo() {
                   paginated.map((p, i) => {
                     const idx = (currentPage - 1) * itemsPerPage + i + 1;
                     const isEditing = editingId === p.id;
-                    const lowStock = (parseInt(p.current_stock) || 0) <= 10;
+                    const colorCls = getStockColor(p.current_stock);
 
                     return (
-                      <tr
-                        key={p.id}
-                        className={`${lowStock ? 'bg-red-50' : ''} ${
-                          isEditing ? 'bg-yellow-50' : ''
-                        }`}
-                      >
-                        <td
-                          className={`px-6 py-4 text-sm ${
-                            lowStock ? 'font-semibold text-red-700' : ''
-                          }`}
-                        >
-                          {idx}
-                        </td>
+                      <tr key={p.id} className={isEditing ? 'bg-yellow-50' : ''}>
+                        {/* S.No */}
+                        <td className={`px-6 py-4 text-sm ${colorCls}`}>{idx}</td>
 
-                        <td
-                          className={`px-6 py-4 text-sm font-medium ${
-                            lowStock ? 'text-red-700' : ''
-                          }`}
-                        >
+                        {/* Product Name */}
+                        <td className={`px-6 py-4 text-sm font-medium ${colorCls}`}>
                           {p.name}
                         </td>
 
                         {/* Unit */}
-                        <td className={`px-6 py-4 text-sm ${lowStock ? 'text-red-700' : ''}`}>
+                        <td className={`px-6 py-4 text-sm ${colorCls}`}>
                           {isEditing ? (
                             <select
                               value={editForm.unit_name || ''}
@@ -369,7 +362,7 @@ export default function ProductInfo() {
                         </td>
 
                         {/* HSN */}
-                        <td className={`px-6 py-4 text-sm ${lowStock ? 'text-red-700' : ''}`}>
+                        <td className={`px-6 py-4 text-sm ${colorCls}`}>
                           {isEditing ? (
                             <input
                               type="text"
@@ -387,7 +380,7 @@ export default function ProductInfo() {
                         {/* Purchase / Profit */}
                         {!isRestricted && (
                           <>
-                            <td className={`px-6 py-4 text-sm ${lowStock ? 'text-red-700' : ''}`}>
+                            <td className={`px-6 py-4 text-sm ${colorCls}`}>
                               {isEditing ? (
                                 <input
                                   type="number"
@@ -405,7 +398,7 @@ export default function ProductInfo() {
                                 `₹${p.purchase_price.toFixed(2)}`
                               )}
                             </td>
-                            <td className={`px-6 py-4 text-sm ${lowStock ? 'text-red-700' : ''}`}>
+                            <td className={`px-6 py-4 text-sm ${colorCls}`}>
                               {isEditing ? (
                                 <input
                                   type="number"
@@ -427,27 +420,21 @@ export default function ProductInfo() {
                         )}
 
                         {/* Costs */}
-                        <td className={`px-6 py-4 text-sm ${lowStock ? 'text-red-700' : ''}`}>
+                        <td className={`px-6 py-4 text-sm ${colorCls}`}>
                           <div>Pre-GST: ₹{p.pre_gst_sale_cost.toFixed(2)}</div>
                           <div>GST: {p.gst.toFixed(2)}%</div>
                           <div>Post-GST: ₹{p.post_gst_sale_cost.toFixed(2)}</div>
                         </td>
 
                         {/* Stocks */}
-                        <td
-                          className={`px-6 py-4 text-sm font-semibold ${
-                            lowStock ? 'text-red-800' : 'text-gray-600'
-                          }`}
-                        >
+                        <td className={`px-6 py-4 text-sm ${colorCls}`}>
                           <div>Purchase: {p.purchase_stock}</div>
                           <div>Sales: {p.sales_stock}</div>
-                          <div className={lowStock ? 'text-red-600' : ''}>
-                            Current: {p.current_stock}
-                          </div>
+                          <div>Current: {p.current_stock}</div>
                         </td>
 
                         {/* Description */}
-                        <td className={`px-6 py-4 text-sm ${lowStock ? 'text-red-700' : ''}`}>
+                        <td className={`px-6 py-4 text-sm ${colorCls}`}>
                           {isEditing ? (
                             <textarea
                               value={editForm.description || ''}
@@ -511,19 +498,15 @@ export default function ProductInfo() {
             {paginated.map((p, i) => {
               const idx = (currentPage - 1) * itemsPerPage + i + 1;
               const isEditing = editingId === p.id;
-              const lowStock = (parseInt(p.current_stock) || 0) <= 10;
+              const colorCls = getStockColor(p.current_stock);
 
               return (
                 <div
                   key={p.id}
-                  className={`rounded-lg bg-white p-4 shadow ${
-                    lowStock ? 'border-2 border-red-400' : ''
-                  } ${isEditing ? 'ring-2 ring-yellow-400' : ''}`}
+                  className={`rounded-lg bg-white p-4 shadow ${isEditing ? 'ring-2 ring-yellow-400' : ''}`}
                 >
                   <div className="mb-3 flex items-start justify-between">
-                    <h3
-                      className={`text-lg font-semibold ${lowStock ? 'text-red-700' : ''}`}
-                    >
+                    <h3 className={`text-lg font-semibold ${colorCls}`}>
                       {idx}. {p.name}
                     </h3>
                     {!isRestricted && (
@@ -561,11 +544,10 @@ export default function ProductInfo() {
                   </div>
 
                   <div className="space-y-3 text-sm">
-                    <div>
+                    <div className={colorCls}>
                       <strong>Unit:</strong>{' '}
                       {isEditing ? (
                         <select
-                        key={p.id + '-unit'}
                           value={editForm.unit_name || ''}
                           onChange={(e) =>
                             setEditForm({ ...editForm, unit_name: e.target.value })
@@ -584,7 +566,7 @@ export default function ProductInfo() {
                       )}
                     </div>
 
-                    <div>
+                    <div className={colorCls}>
                       <strong>HSN:</strong>{' '}
                       {isEditing ? (
                         <input
@@ -602,7 +584,7 @@ export default function ProductInfo() {
 
                     {!isRestricted && (
                       <>
-                        <div>
+                        <div className={colorCls}>
                           <strong>Purchase:</strong>{' '}
                           {isEditing ? (
                             <input
@@ -621,7 +603,7 @@ export default function ProductInfo() {
                             `₹${p.purchase_price.toFixed(2)}`
                           )}
                         </div>
-                        <div>
+                        <div className={colorCls}>
                           <strong>Profit:</strong>{' '}
                           {isEditing ? (
                             <input
@@ -643,21 +625,19 @@ export default function ProductInfo() {
                       </>
                     )}
 
-                    <div className={lowStock ? 'text-red-700' : ''}>
+                    <div className={colorCls}>
                       <strong>Costs:</strong>
                       <br />
                       Pre: ₹{p.pre_gst_sale_cost.toFixed(2)} | GST: {p.gst}% | Post: ₹
                       {p.post_gst_sale_cost.toFixed(2)}
                     </div>
 
-                    <div className="font-semibold">
+                    <div className={`font-semibold ${colorCls}`}>
                       <strong>Stocks:</strong>{' '}
-                      <span className={lowStock ? 'text-red-600' : ''}>
-                        Purchase:{p.purchase_stock} Sales:{p.sales_stock} Current:{p.current_stock}
-                      </span>
+                      Purchase:{p.purchase_stock} Sales:{p.sales_stock} Current:{p.current_stock}
                     </div>
 
-                    <div>
+                    <div className={colorCls}>
                       <strong>Description:</strong>{' '}
                       {isEditing ? (
                         <textarea
@@ -754,40 +734,17 @@ export default function ProductInfo() {
         </div>
       </div>
 
-      {/* <style jsx>{`
-        @keyframes slide-in {
-          from {
-            transform: translateX(100%);
-            opacity: 0;
-          }
-          to {
-            transform: translateX(0);
-            opacity: 1;
-          }
-        }
-        .animate-slide-in {
-          animation: slide-in 0.3s ease-out;
-        }
-      `}</style> */}
       <style
-  dangerouslySetInnerHTML={{
-    __html: `
-      @keyframes slide-in {
-        from {
-          transform: translateX(100%);
-          opacity: 0;
-        }
-        to {
-          transform: translateX(0);
-          opacity: 1;
-        }
-      }
-      .animate-slide-in {
-        animation: slide-in 0.3s ease-out;
-      }
-    `,
-  }}
-/>
+        dangerouslySetInnerHTML={{
+          __html: `
+            @keyframes slide-in {
+              from { transform: translateX(100%); opacity: 0; }
+              to   { transform: translateX(0);    opacity: 1; }
+            }
+            .animate-slide-in { animation: slide-in 0.3s ease-out; }
+          `,
+        }}
+      />
     </>
   );
 }
