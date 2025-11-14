@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------
 // USER INFO (DO NOT MODIFY)
 // ---------------------------------------------------------------------
-// Current time: November 13, 2025 11:45 PM IST
+// Current time: November 10, 2025 04:07 PM IST
 // Location: Airoli, Maharashtra, IN
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -18,6 +18,8 @@ import { API_BASE_URL } from '../config';
 // ---------------------------------------------------------------------
 // API Base URL
 // ---------------------------------------------------------------------
+//const API_BASE_URL = "http://127.0.0.1:8000/api";
+
 const paymentModeMap = {
   credit_card: 1, debit_card: 2, cash: 3, upi: 4,
   bank_transfer: 5, phonepe: 6
@@ -29,16 +31,15 @@ const reversePaymentModeMap = Object.fromEntries(
 // ---------------------------------------------------------------------
 // Helper – populate unit <select>
 // ---------------------------------------------------------------------
-const populateUnitDropdown = (select, units, selectedUnitId = null) => {
+const populateUnitDropdown = (select, units) => {
   if (!select) return;
-  select.innerHTML = '<option value="" disabled>Select Unit</option>';
+  select.innerHTML = '<option value="" disabled selected>Select Unit</option>';
   units.forEach(u => {
     const opt = document.createElement('option');
     opt.value = u.unit_id;
     opt.textContent = u.unit_name;
     opt.dataset.salePrice = u.sale_price;
     opt.dataset.gst = u.gst;
-    if (selectedUnitId && u.unit_id == selectedUnitId) opt.selected = true;
     select.appendChild(opt);
   });
 };
@@ -60,7 +61,7 @@ const calcRowTotal = (item) => {
 // ---------------------------------------------------------------------
 // handleProductSelection – works for add & edit
 // ---------------------------------------------------------------------
-const handleProductSelection = async (row, productId, isEdit = false, setItems, rowId, showToast, selectedUnitId = null) => {
+const handleProductSelection = async (row, productId, isEdit = false, setItems, rowId, showToast) => {
   if (!productId) return;
   const token = localStorage.getItem('authToken');
   try {
@@ -68,7 +69,7 @@ const handleProductSelection = async (row, productId, isEdit = false, setItems, 
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
-        'Accept': 'application/json',  // Fixed: was 'astro'
+        Accept: 'application/json',
         'Content-Type': 'application/json'
       }
     });
@@ -81,13 +82,13 @@ const handleProductSelection = async (row, productId, isEdit = false, setItems, 
     const gstInput = row.querySelector('.sale-gst');
     const discountInput = row.querySelector('.sale-discount');
 
-    populateUnitDropdown(unitSelect, units, selectedUnitId);
+    populateUnitDropdown(unitSelect, units);
 
     if (units.length > 0) {
-      const selectedUnit = units.find(u => u.unit_id == (selectedUnitId || units[0].unit_id)) || units[0];
-      unitSelect.value = selectedUnit.unit_id;
-      costInput.value = Number(selectedUnit.sale_price || 0).toFixed(2);
-      gstInput.value = Number(selectedUnit.gst || 0).toFixed(2);
+      const first = units[0];
+      unitSelect.value = first.unit_id;
+      costInput.value = Number(first.sale_price || 0).toFixed(2);
+      gstInput.value = Number(first.gst || 0).toFixed(2);
       discountInput.value = '0.00';
 
       setItems(prev => prev.map(i =>
@@ -95,16 +96,16 @@ const handleProductSelection = async (row, productId, isEdit = false, setItems, 
           ? {
               ...i,
               product_id: productId,
-              unit_id: selectedUnit.unit_id,
-              cost: Number(selectedUnit.sale_price || 0),
-              gst: Number(selectedUnit.gst || 0),
+              unit_id: first.unit_id,
+              cost: Number(first.sale_price || 0),
+              gst: Number(first.gst || 0),
               discount: 0,
               total: calcRowTotal({
                 ...i,
-                cost: Number(selectedUnit.sale_price || 0),
+                cost: Number(first.sale_price || 0),
                 quantity: i.quantity || 0,
                 discount: 0,
-                gst: Number(selectedUnit.gst || 0)
+                gst: Number(first.gst || 0)
               })
             }
           : i
@@ -175,7 +176,7 @@ export default function SalesDashboard() {
   const [editTotals, setEditTotals] = useState({ subtotal: 0, payable: 0, due: 0 });
   const [toast, setToast] = useState(null);
   const [currentDateTime, setCurrentDateTime] = useState('');
-  const [userName, setUserName] = useState('Loading...');
+  const [userName, setUserName] = useState('Loading...'); // Fetch user name
 
   const token = localStorage.getItem('authToken');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -183,10 +184,10 @@ export default function SalesDashboard() {
   const currency = JSON.parse(localStorage.getItem('selectedCompany') || '{}')?.currency || '₹';
 
   const autocompleteRefs = useRef({});
-  const saleItemsBodyRef = useRef(null);
+  const saleItemsBodyRef =useRef(null);
 
   // -----------------------------------------------------------------
-  // Fetch User Name
+  // Fetch User Name (Same as Purchase)
   // -----------------------------------------------------------------
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -200,7 +201,7 @@ export default function SalesDashboard() {
     if (!token) return;
     try {
       const res = await fetch(`${API_BASE_URL}/user/${userId}`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
       if (data.status === 'success') {
@@ -277,7 +278,7 @@ export default function SalesDashboard() {
   };
 
   // -----------------------------------------------------------------
-  // Lazy load single sale (View)
+  // NEW: fetch single sale for View modal (lazy)
   // -----------------------------------------------------------------
   const fetchSaleForView = async (transactionId) => {
     try {
@@ -423,21 +424,31 @@ export default function SalesDashboard() {
   };
 
   // -----------------------------------------------------------------
-  // Add Sale – with `dis`, `p_price`, and proper `name`
+  // Add Sale – Auto-fill name if empty
   // -----------------------------------------------------------------
   const handleAddSale = async e => {
     e.preventDefault();
     const form = e.target;
 
+    // Get values
     const rawName = form.nameWithDate?.value?.trim() || '';
     const dateInput = form.saleDateTime.value;
-    if (!dateInput) return showToast('Please select date & time', true);
+
+    // Validate date
+    if (!dateInput) {
+      showToast('Please select date & time', true);
+      return;
+    }
 
     const formattedDate = new Date(dateInput).toISOString().slice(0, 19).replace('T', ' ');
     const displayDate = dateInput.slice(0, 16).replace('T', ' ');
-    const nameWithDate = rawName ? `${rawName} ${displayDate}` : `Sale Bill ${displayDate}`;
 
-    const itemsWithTotal = saleItems.map(i => ({
+    // Auto-fill name if empty
+    const nameWithDate = rawName 
+      ? `${rawName} ${displayDate}` 
+      : formattedDate;  // Just date-time if blank
+
+    const itemsWithTotal = (saleItems || []).map(i => ({
       ...i,
       total: calcRowTotal(i)
     }));
@@ -455,9 +466,7 @@ export default function SalesDashboard() {
         quantity: parseFloat(i.quantity.toFixed(3)),
         unit_id: i.unit_id,
         s_price: parseFloat(i.cost.toFixed(2)),
-        p_price: 0,  // REQUIRED FIELD
         discount: i.discount,
-        dis: i.discount,
         gst: parseFloat(i.gst.toFixed(2))
       }))
     };
@@ -468,13 +477,15 @@ export default function SalesDashboard() {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
-          'Accept': 'application/json'  // Fixed typo
+          'Accept': 'application/json'
         },
         body: JSON.stringify(payload)
       });
 
       const text = await res.text();
-      if (!res.ok) throw new Error(text.includes('Stock') ? 'Not enough stock!' : text || 'Save failed');
+      if (!res.ok) {
+        throw new Error(text.includes('Stock') ? 'Not enough stock!' : text || 'Save failed');
+      }
 
       setShowAddSale(false);
       setSaleItems([]);
@@ -488,7 +499,7 @@ export default function SalesDashboard() {
   };
 
   // -----------------------------------------------------------------
-  // Edit Sale – open
+  // EDIT SALE – Auto-fill name if empty
   // -----------------------------------------------------------------
   const createEmptySaleItem = () => ({
     id: Date.now() + Math.random(),
@@ -507,11 +518,13 @@ export default function SalesDashboard() {
       setEditOriginalPaid(parseFloat(data.paid_amount) || 0);
       setSelectedCustomer({ id: data.customer_id, name: data.customer_name });
 
-      const nameParts = (data.bill_name || '').trim().split(' ');
-      const billName = nameParts.length > 5 ? nameParts.slice(0, -5).join(' ').trim() : nameParts.join(' ').trim();
+      // Extract name without date
+      const nameParts = (data.bill_name || '').split(' ');
+      const possibleDate = nameParts.slice(-5).join(' ');
+      const nameWithoutDate = nameParts.slice(0, -5).join(' ') || '';
 
       setEditForm({
-        nameWithDate: billName,
+        nameWithDate: nameWithoutDate,
         dateTime: data.date.slice(0, 16).replace(' ', 'T'),
         paymentMode: reversePaymentModeMap[data.payment_mode] || 'cash',
         absoluteDiscount: parseFloat(data.absolute_discount) || 0,
@@ -526,7 +539,6 @@ export default function SalesDashboard() {
           product_name: p.product_name,
           quantity: parseFloat(p.quantity) || 0,
           unit_id: p.unit_id,
-          unit_name: p.unit_name,
           discount: parseFloat(p.discount) || 0,
           gst: parseFloat(p.gst) || 0,
           cost: parseFloat(p.s_price) || 0,
@@ -541,14 +553,13 @@ export default function SalesDashboard() {
         items.forEach(itm => {
           const inp = document.getElementById(`edit-sale-product-input-${itm.id}`);
           if (inp) {
-            inp.value = itm.product_name || '';
             const ref = { current: inp };
             autocompleteRefs.current[itm.id] = ref;
             setupAutocomplete(itm.id, ref, true, setEditSaleItems);
 
             const row = inp.closest('tr');
             if (row && itm.product_id) {
-              handleProductSelection(row, itm.product_id, true, setEditSaleItems, itm.id, showToast, itm.unit_id);
+              handleProductSelection(row, itm.product_id, true, setEditSaleItems, itm.id, showToast);
             }
           }
         });
@@ -559,7 +570,7 @@ export default function SalesDashboard() {
   };
 
   // -----------------------------------------------------------------
-  // saveEditedSale – with `dis` fix
+  // saveEditedSale – Auto-fill name if empty
   // -----------------------------------------------------------------
   const saveEditedSale = async () => {
     const validProducts = editSaleItems
@@ -582,18 +593,23 @@ export default function SalesDashboard() {
           s_price: parseFloat(cost.toFixed(2)),
           unit_id: parseInt(p.unit_id, 10),
           discount: dis,
-          dis: dis,
           gst: gst
         };
       });
 
-    if (validProducts.length === 0) return showToast('Add at least one valid product', true);
+    if (validProducts.length === 0) {
+      return showToast('Add at least one valid product', true);
+    }
 
+    // Auto-fill name if empty
     const rawName = editForm.nameWithDate?.trim() || '';
     const dateInput = editForm.dateTime || new Date().toISOString().slice(0, 16);
     const displayDate = dateInput.slice(0, 16).replace('T', ' ');
     const formattedDate = `${dateInput.replace('T', ' ')}:00`;
-    const nameWithDate = rawName ? `${rawName} ${displayDate}` : `Sale ${displayDate}`;
+
+    const nameWithDate = rawName 
+      ? `${rawName} ${displayDate}` 
+      : formattedDate;
 
     const payload = {
       name: nameWithDate,
@@ -612,22 +628,30 @@ export default function SalesDashboard() {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
-          'Accept': 'application/json'  // Fixed typo
+          'Accept': 'application/json'
         },
         body: JSON.stringify(payload)
       });
 
       const text = await res.text();
       if (!res.ok) {
-        let msg = 'Update failed';
-        try { const err = JSON.parse(text); msg = err.message || JSON.stringify(err.errors || {}); } catch {}
-        throw new Error(msg);
+        let errorMsg = 'Update failed';
+        try {
+          const err = JSON.parse(text);
+          errorMsg = err.message || JSON.stringify(err.errors || {});
+        } catch {
+          errorMsg = text;
+        }
+        throw new Error(errorMsg);
       }
 
       showToast('Sale updated successfully');
       setShowEditSale(false);
       setEditSaleItems([]);
-      setEditForm({ nameWithDate: '', dateTime: '', paymentMode: 'cash', absoluteDiscount: 0, setPaidAmount: 0 });
+      setEditForm({
+        nameWithDate: '', dateTime: '', paymentMode: 'cash',
+        absoluteDiscount: 0, setPaidAmount: 0
+      });
       fetchSales();
     } catch (err) {
       showToast(err.message || 'Failed to update', true);
@@ -685,20 +709,6 @@ export default function SalesDashboard() {
   };
 
   // -----------------------------------------------------------------
-  // Sync product name in edit
-  // -----------------------------------------------------------------
-  useEffect(() => {
-    if (showEditSale) {
-      editSaleItems.forEach(itm => {
-        const inp = document.getElementById(`edit-sale-product-input-${itm.id}`);
-        if (inp && inp.value !== itm.product_name) {
-          inp.value = itm.product_name || '';
-        }
-      });
-    }
-  }, [editSaleItems, showEditSale]);
-
-  // -----------------------------------------------------------------
   // Render
   // -----------------------------------------------------------------
   return (
@@ -747,9 +757,9 @@ export default function SalesDashboard() {
           </button>
         </div>
 
-        {/* Sales List */}
+        {/* Sales List - Responsive: Table on md+, Cards on mobile */}
         <div className="bg-white rounded-lg shadow overflow-hidden">
-          {/* Desktop */}
+          {/* Desktop Table Header */}
           <div className="hidden md:block">
             <table className="w-full">
               <thead className="bg-gray-50">
@@ -767,11 +777,15 @@ export default function SalesDashboard() {
               <tbody>
                 {paginated.map((sale, i) => (
                   <tr key={sale.transaction_id} className="border-t hover:bg-gray-50">
-                    <td className="px-4 py-3">{(currentPage - 1) * itemsPerPage + i + 1}</td>
+                    <td className="px-4 py-3">
+                      {(currentPage - 1) * itemsPerPage + i + 1}
+                    </td>
                     <td className="px-4 py-3">{sale.date}</td>
                     <td className="px-4 py-3">{sale.bill_name}</td>
                     <td className="px-4 py-3">{sale.customer_name}</td>
-                    <td className="px-4 py-3">{reversePaymentModeMap[sale.payment_mode] || 'Cash'}</td>
+                    <td className="px-4 py-3">
+                      {reversePaymentModeMap[sale.payment_mode] || 'Cash'}
+                    </td>
                     <td className="px-4 py-3">{sale.sales_by}</td>
                     <td className="px-4 py-3">
                       <button onClick={() => downloadInvoice(sale.transaction_id)} className="text-cyan-600 hover:text-cyan-800">
@@ -779,7 +793,11 @@ export default function SalesDashboard() {
                       </button>
                     </td>
                     <td className="px-4 py-3 flex gap-2">
-                      <button onClick={() => fetchSaleForView(sale.transaction_id)} className="text-blue-600 hover:text-blue-800" title="View Details">
+                      <button
+                        onClick={() => fetchSaleForView(sale.transaction_id)}
+                        className="text-blue-600 hover:text-blue-800"
+                        title="View Details"
+                      >
                         <Eye className="w-5 h-5" />
                       </button>
                       <button onClick={() => openEditSale(sale.transaction_id)} className="text-green-600 hover:text-green-800">
@@ -795,17 +813,20 @@ export default function SalesDashboard() {
             </table>
           </div>
 
-          {/* Mobile */}
+          {/* Mobile Card View */}
           <div className="md:hidden space-y-3 p-4">
             {paginated.map((sale, i) => (
-              <div key={sale.transaction_id} className="bg-white border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
+              <div key="mobile-card" className="bg-white border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
                 <div className="flex justify-between items-start mb-2">
                   <div>
                     <p className="font-semibold text-lg">#{sale.transaction_id}</p>
                     <p className="text-sm text-gray-600">{sale.date}</p>
                   </div>
                   <div className="flex gap-1">
-                    <button onClick={() => fetchSaleForView(sale.transaction_id)} className="p-1 text-blue-600">
+                    <button
+                      onClick={() => fetchSaleForView(sale.transaction_id)}
+                      className="p-1 text-blue-600"
+                    >
                       <Eye className="w-5 h-5" />
                     </button>
                     <button onClick={() => openEditSale(sale.transaction_id)} className="p-1 text-green-600">
@@ -818,15 +839,28 @@ export default function SalesDashboard() {
                 </div>
 
                 <div className="space-y-1 text-sm">
-                  <div className="flex justify-between"><span className="font-medium">Bill:</span><span>{sale.bill_name}</span></div>
-                  <div className="flex justify-between"><span className="font-medium">Customer:</span><span>{sale.customer_name}</span></div>
-                  <div className="flex justify-between"><span className="font-medium">Payment:</span><span>{reversePaymentModeMap[sale.payment_mode] || 'Cash'}</span></div>
-                  <div className="flex justify-between"><span className="font-medium">Sold By:</span><span>{sale.sales_by}</span></div>
+                  <div className="flex justify-between">
+                    <span className="font-medium">Bill:</span>
+                    <span>{sale.bill_name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-medium">Customer:</span>
+                    <span>{sale.customer_name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-medium">Payment:</span>
+                    <span>{reversePaymentModeMap[sale.payment_mode] || 'Cash'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-medium">Sold By:</span>
+                    <span>{sale.sales_by}</span>
+                  </div>
                 </div>
 
                 <div className="mt-3 flex justify-end">
                   <button onClick={() => downloadInvoice(sale.transaction_id)} className="text-cyan-600 flex items-center gap-1 text-sm">
-                    <Download className="w-4 h-4" /> Invoice
+                    <Download className="w-4 h-4" />
+                    Invoice
                   </button>
                 </div>
               </div>
@@ -911,19 +945,27 @@ export default function SalesDashboard() {
           <div className="bg-white rounded-lg max-w-6xl w-full max-h-screen overflow-y-auto">
             <div className="p-4 border-b flex justify-between items-center">
               <h2 className="text-xl font-bold">Edit Sale</h2>
-              <button onClick={() => { setShowEditSale(false); setEditSaleItems([]); }} className="text-gray-500 hover:text-gray-700"><X /></button>
+              <button onClick={() => {
+                setShowEditSale(false);
+                setEditSaleItems([]);
+              }} className="text-gray-500 hover:text-gray-700"><X /></button>
             </div>
 
             <div className="p-4 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <input 
-                  value={editForm.nameWithDate} 
-                  onChange={e => setEditForm(p => ({ ...p, nameWithDate: e.target.value }))} 
-                  placeholder="Bill Name" 
-                  className="px-3 py-2 border rounded" 
+                <input
+                  value={editForm.nameWithDate}
+                  onChange={e => setEditForm(p => ({ ...p, nameWithDate: e.target.value }))}
+                  placeholder="Bill Name (date will be appended)"
+                  className="px-3 py-2 border rounded"
                 />
                 <input value={selectedCustomer?.name || ''} readOnly className="px-3 py-2 border rounded bg-gray-50" />
-                <input type="datetime-local" value={editForm.dateTime} onChange={e => setEditForm(p => ({ ...p, dateTime: e.target.value }))} className="px-3 py-2 border rounded" />
+                <input
+                  type="datetime-local"
+                  value={editForm.dateTime}
+                  onChange={e => setEditForm(p => ({ ...p, dateTime: e.target.value }))}
+                  className="px-3 py-2 border rounded"
+                />
               </div>
 
               <div className="overflow-x-auto">
@@ -944,60 +986,119 @@ export default function SalesDashboard() {
                     {editSaleItems.map(item => (
                       <tr key={`edit-sale-item-${item.id}`} data-row-id={item.id}>
                         <td className="p-1 relative">
-                          <input 
-                            id={`edit-sale-product-input-${item.id}`} 
-                            type="text" 
-                            placeholder="Search product..." 
-                            value={item.product_name || ''} 
-                            onChange={e => setEditSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, product_name: e.target.value } : i))}
-                            className="w-full p-1 border rounded text-sm" 
+                          <input
+                            id={`edit-sale-product-input-${item.id}`}
+                            type="text"
+                            placeholder="Search product..."
+                            value={item.product_name || ''}
+                            onChange={e => setEditSaleItems(prev => prev.map(i =>
+                              i.id === item.id ? { ...i, product_name: e.target.value } : i
+                            ))}
+                            className="w-full p-1 border rounded text-sm"
                           />
                           <input type="hidden" id={`edit-sale-product-id-${item.id}`} value={item.product_id} />
                           <div id={`edit-sale-suggestions-${item.id}`} className="absolute z-10 bg-white border rounded mt-1 max-h-32 overflow-y-auto w-full hidden"></div>
                         </td>
-                        <td className="p-1"><input type="number" step="0.01" value={item.quantity} onChange={e => setEditSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, quantity: parseFloat(e.target.value) || 0 }) } : i))} className="w-16 p-1 border rounded" /></td>
-                        <td className="p-1"><select className="sale-unit w-full p-1 border rounded text-sm" value={item.unit_id} onChange={e => setEditSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, unit_id: e.target.value } : i))}><option value="">Select Unit</option></select></td>
-                        <td className="p-1"><input type="number" className="sale-discount w-16 p-1 border rounded" value={item.discount} onChange={e => setEditSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, discount: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, discount: parseFloat(e.target.value) || 0 }) } : i))} /></td>
-                        <td className="p-1"><input type="number" className="sale-gst w-16 p-1 border rounded" value={item.gst} onChange={e => setEditSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, gst: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, gst: parseFloat(e.target.value) || 0 }) } : i))} /></td>
-                        <td className="p-1"><input type="number" step="0.01" className="sale-cost w-full p-1 border rounded" value={item.cost} onChange={e => setEditSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, cost: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, cost: parseFloat(e.target.value) || 0 }) } : i))} /></td>
+                        <td className="p-1">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={item.quantity}
+                            onChange={e => setEditSaleItems(prev => prev.map(i =>
+                              i.id === item.id ? { ...i, quantity: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, quantity: parseFloat(e.target.value) || 0 }) } : i
+                            ))}
+                            className="w-16 p-1 border rounded"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <select
+                            className="sale-unit w-full p-1 border rounded text-sm"
+                            value={item.unit_id}
+                            onChange={e => setEditSaleItems(prev => prev.map(i =>
+                              i.id === item.id ? { ...i, unit_id: e.target.value } : i
+                            ))}
+                          >
+                            <option value="">Select Unit</option>
+                          </select>
+                        </td>
+                        <td className="p-1">
+                          <input
+                            type="number"
+                            className="sale-discount w-16 p-1 border rounded"
+                            value={item.discount}
+                            onChange={e => setEditSaleItems(prev => prev.map(i =>
+                              i.id === item.id ? { ...i, discount: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, discount: parseFloat(e.target.value) || 0 }) } : i
+                            ))}
+                          />
+                        </td>
+                        <td className="p-1">
+                          <input
+                            type="number"
+                            className="sale-gst w-16 p-1 border rounded"
+                            value={item.gst}
+                            onChange={e => setEditSaleItems(prev => prev.map(i =>
+                              i.id === item.id ? { ...i, gst: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, gst: parseFloat(e.target.value) || 0 }) } : i
+                            ))}
+                          />
+                        </td>
+                        <td className="p-1">
+                          <input
+                            type="number"
+                            step="0.01"
+                            className="sale-cost w-full p-1 border rounded"
+                            value={item.cost}
+                            onChange={e => setEditSaleItems(prev => prev.map(i =>
+                              i.id === item.id ? { ...i, cost: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, cost: parseFloat(e.target.value) || 0 }) } : i
+                            ))}
+                          />
+                        </td>
                         <td className="p-1 text-right">{currency}{item.total.toFixed(2)}</td>
-                        <td className="p-1 text-center"><button type="button" onClick={() => removeItem(item.id, true)} className="text-red-600"><X className="w-4 h-4" /></button></td>
+                        <td className="p-1 text-center">
+                          <button type="button" onClick={() => removeItem(item.id, true)} className="text-red-600"><X className="w-4 h-4" /></button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
 
-              {/* Add Item + Calculate (Right Bottom) */}
-              <div className="flex justify-between items-center mb-4">
-                <button type="button" onClick={() => addItemRow(true)} className="text-cyan-600 text-sm font-medium hover:text-cyan-700">
-                  + Add Item
-                </button>
-                <button type="button" onClick={() => setEditSaleItems(prev => prev.map(i => ({ ...i, total: calcRowTotal(i) })))} className="bg-yellow-500 text-white px-4 py-2 rounded text-sm flex items-center gap-1 shadow-md hover:bg-yellow-600">
-                  <Calculator className="w-5 h-5" /> Calculate
-                </button>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => addItemRow(true)} className="text-cyan-600 text-sm">+ Add Item</button>
+                <button type="button" onClick={() => {
+                  setEditSaleItems(prev => prev.map(i => ({ ...i, total: calcRowTotal(i) })));
+                }} className="bg-yellow-500 text-white px-3 py-1 rounded text-sm flex items-center gap-1"><Calculator className="w-4 h-4" /> Calculate</button>
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
                 <div><strong>Subtotal:</strong> {currency}{editTotals.subtotal}</div>
-
-                <div>
-                  <label className="block font-medium text-gray-700 mb-1">Abs. Discount</label>
-                  <input type="number" step="0.01" value={editForm.absoluteDiscount} onChange={e => setEditForm(p => ({ ...p, absoluteDiscount: parseFloat(e.target.value) || 0 }))} className="w-full p-2 border rounded" />
-                </div>
-
+                <input
+                  type="number"
+                  step="0.01"
+                  value={editForm.absoluteDiscount}
+                  onChange={e => setEditForm(p => ({ ...p, absoluteDiscount: parseFloat(e.target.value) || 0 }))}
+                  placeholder="Abs. Discount"
+                  className="p-2 border rounded"
+                />
                 <div><strong>Payable:</strong> {currency}{editTotals.payable}</div>
-
-                <div>
-                  <label className="block font-medium text-gray-700 mb-1">Paid</label>
-                  <input type="number" step="0.01" value={editForm.setPaidAmount} onChange={e => setEditForm(p => ({ ...p, setPaidAmount: parseFloat(e.target.value) || 0 }))} className="w-full p-2 border rounded" />
-                </div>
-
+                <input
+                  type="number"
+                  step="0.01"
+                  value={editForm.setPaidAmount}
+                  onChange={e => setEditForm(p => ({ ...p, setPaidAmount: parseFloat(e.target.value) || 0 }))}
+                  placeholder="Paid Adj."
+                  className="p-2 border rounded"
+                />
                 <div><strong>Due:</strong> {currency}{editTotals.due}</div>
               </div>
 
-              <select value={editForm.paymentMode} onChange={e => setEditForm(p => ({ ...p, paymentMode: e.target.value }))} className="w-full md:w-64 p-2 border rounded">
-                {Object.keys(paymentModeMap).map(m => <option key={m} value={m}>{m.replace('_', ' ')}</option>)}
+              <select
+                value={editForm.paymentMode}
+                onChange={e => setEditForm(p => ({ ...p, paymentMode: e.target.value }))}
+                className="w-full md:w-64 p-2 border rounded"
+              >
+                {Object.keys(paymentModeMap).map(m => (
+                  <option key={m} value={m}>{m.replace('_', ' ')}</option>
+                ))}
               </select>
 
               <div className="flex gap-2">
@@ -1027,14 +1128,18 @@ export default function SalesDashboard() {
                 <p className="text-center text-gray-500">No customers found</p>
               ) : (
                 customers.map(c => (
-                  <div key={c.id} onClick={() => {
-                    setSelectedCustomer({ id: c.id, name: c.name });
-                    setShowSearchCustomer(false);
-                    setShowAddSale(true);
-                    setSaleItems([]);
-                    addItemRow();
-                    setCurrentDateTime(new Date().toISOString().slice(0, 16));
-                  }} className="p-3 border-b hover:bg-gray-50 cursor-pointer">
+                  <div
+                    key={c.id}
+                    onClick={() => {
+                      setSelectedCustomer({ id: c.id, name: c.name });
+                      setShowSearchCustomer(false);
+                      setShowAddSale(true);
+                      setSaleItems([]);
+                      addItemRow();
+                      setCurrentDateTime(new Date().toISOString().slice(0, 16));
+                    }}
+                    className="p-3 border-b hover:bg-gray-50 cursor-pointer"
+                  >
                     <p className="font-semibold">{c.name}</p>
                     <p className="text-sm text-gray-600">{c.phone} | {c.email}</p>
                   </div>
@@ -1052,14 +1157,29 @@ export default function SalesDashboard() {
             <form onSubmit={handleAddSale}>
               <div className="p-4 border-b flex justify-between">
                 <h2 className="text-xl font-bold">Add New Sale</h2>
-                <button type="button" onClick={() => { setShowAddSale(false); setSaleItems([]); setCurrentDateTime(''); }}><X /></button>
+                <button type="button" onClick={() => {
+                  setShowAddSale(false);
+                  setSaleItems([]);
+                  setCurrentDateTime('');
+                }}><X /></button>
               </div>
 
               <div className="p-4 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <input name="nameWithDate" placeholder="Bill Name (date will be appended)" className="p-2 border rounded" />
+                  <input 
+                    name="nameWithDate" 
+                    placeholder="Bill Name (date will be appended)" 
+                    className="p-2 border rounded" 
+                  />
                   <input value={selectedCustomer?.name || ''} readOnly className="p-2 border rounded bg-gray-100" />
-                  <input name="saleDateTime" type="datetime-local" className="p-2 border rounded" value={currentDateTime} onChange={e => setCurrentDateTime(e.target.value)} required />
+                  <input
+                    name="saleDateTime"
+                    type="datetime-local"
+                    className="p-2 border rounded"
+                    value={currentDateTime}
+                    onChange={e => setCurrentDateTime(e.target.value)}
+                    required
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -1084,56 +1204,169 @@ export default function SalesDashboard() {
 
                           <td className="p-1">
                             <div className="autocomplete-container">
-                              <input id={`product-input-${item.id}`} type="text" placeholder="Product" className="w-full p-1 border rounded text-sm sale-product-input" value={item.product_name || ''} onChange={e => setSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, product_name: e.target.value } : i))} />
+                              <input
+                                id={`product-input-${item.id}`}
+                                type="text"
+                                placeholder="Product"
+                                className="w-full p-1 border rounded text-sm sale-product-input"
+                                value={item.product_name || ''}
+                                onChange={e => {
+                                  const newName = e.target.value;
+                                  setSaleItems(prev => prev.map(i =>
+                                    i.id === item.id ? { ...i, product_name: newName } : i
+                                  ));
+                                }}
+                              />
                               <input type="hidden" id={`add-product-id-${item.id}`} className="sale-product-id" value={item.product_id} />
                               <div id={`add-suggestions-${item.id}`} className="border rounded mt-1 max-h-32 overflow-y-auto"></div>
                             </div>
                           </td>
 
-                          <td className="p-1"><input type="number" step="0.01" value={item.quantity} onChange={e => setSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, quantity: parseFloat(e.target.value) || 0 }) } : i))} className="w-16 p-1 border rounded text-sm sale-quantity" /></td>
+                          <td className="p-1">
+                            <input
+                              type="number"
+                              step="0.01"
+                              className="w-16 p-1 border rounded text-sm sale-quantity"
+                              value={item.quantity}
+                              onChange={e => {
+                                const qty = parseFloat(e.target.value) || 0;
+                                setSaleItems(prev => prev.map(i =>
+                                  i.id === item.id ? { ...i, quantity: qty, total: calcRowTotal({ ...i, quantity: qty }) } : i
+                                ));
+                              }}
+                            />
+                          </td>
 
-                          <td className="p-1"><select className="sale-unit w-full p-1 border rounded text-sm"><option value="" disabled selected>Select Unit</option></select></td>
+                          <td className="p-1">
+                            <select className="sale-unit w-full p-1 border rounded text-sm">
+                              <option value="" disabled selected>Select Unit</option>
+                            </select>
+                          </td>
 
-                          <td className="p-1"><input type="number" className="sale-discount w-16 p-1 border rounded text-sm" value={item.discount} onChange={e => setSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, discount: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, discount: parseFloat(e.target.value) || 0 }) } : i))} /></td>
+                          <td className="p-1">
+                            <input
+                              type="number"
+                              className="sale-discount w-16 p-1 border rounded text-sm"
+                              value={item.discount}
+                              onChange={e => {
+                                const disc = parseFloat(e.target.value) || 0;
+                                setSaleItems(prev => prev.map(i =>
+                                  i.id === item.id ? { ...i, discount: disc, total: calcRowTotal({ ...i, discount: disc }) } : i
+                                ));
+                              }}
+                            />
+                          </td>
 
-                          <td className="p-1"><input type="number" className="sale-gst w-16 p-1 border rounded text-sm" value={item.gst} onChange={e => setSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, gst: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, gst: parseFloat(e.target.value) || 0 }) } : i))} /></td>
+                          <td className="p-1">
+                            <input
+                              type="number"
+                              className="sale-gst w-16 p-1 border rounded text-sm"
+                              value={item.gst}
+                              onChange={e => {
+                                const gst = parseFloat(e.target.value) || 0;
+                                setSaleItems(prev => prev.map(i =>
+                                  i.id === item.id ? { ...i, gst, total: calcRowTotal({ ...i, gst }) } : i
+                                ));
+                              }}
+                            />
+                          </td>
 
-                          <td className="p-1"><input id={`add-cost-${item.id}`} type="number" step="0.01" className="sale-cost w-20 p-1 border rounded text-sm" value={item.cost} onChange={e => setSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, cost: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, cost: parseFloat(e.target.value) || 0 }) } : i))} /></td>
+                          <td className="p-1">
+                            <input
+                              id={`add-cost-${item.id}`}
+                              type="number"
+                              step="0.01"
+                              className="sale-cost w-20 p-1 border rounded text-sm"
+                              value={item.cost}
+                              onChange={e => {
+                                const cost = parseFloat(e.target.value) || 0;
+                                setSaleItems(prev => prev.map(i =>
+                                  i.id === item.id ? { ...i, cost, total: calcRowTotal({ ...i, cost }) } : i
+                                ));
+                              }}
+                            />
+                          </td>
 
                           <td className="p-1 font-medium sale-total-cost">{currency}{item.total.toFixed(2)}</td>
 
-                          <td><button type="button" onClick={() => removeItem(item.id)} className="text-red-600"><X className="w-4 h-4" /></button></td>
+                          <td>
+                            <button
+                              type="button"
+                              onClick={() => removeItem(item.id)}
+                              className="text-red-600"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
 
-                  {/* Add Item + Calculate (Right Bottom) */}
-                  <div className="flex justify-between items-center mt-2">
-                    <button type="button" onClick={() => addItemRow()} className="text-cyan-600 text-sm font-medium hover:text-cyan-700">
-                      + Add Item
-                    </button>
-                    <button type="button" onClick={() => setSaleItems(prev => prev.map(i => ({ ...i, total: calcRowTotal(i) })))} className="bg-yellow-500 text-white px-4 py-2 rounded text-sm flex items-center gap-1 shadow-md hover:bg-yellow-600">
-                      <Calculator className="w-5 h-5" /> Calculate
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => addItemRow()} className="text-cyan-600 text-sm">+ Add Item</button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSaleItems(prev => prev.map(i => ({ ...i, total: calcRowTotal(i) })));
+                      }}
+                      className="bg-yellow-500 text-white px-3 py-1 rounded text-sm flex items-center gap-1"
+                    >
+                      <Calculator className="w-4 h-4" /> Calculate
                     </button>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
                   <div><strong>Final:</strong> <span id="saleFinalTotal">{currency}{getFinalTotal(saleItems)}</span></div>
-                  <input name="absoluteDiscount" type="number" step="0.01" placeholder="Abs. Discount" className="p-2 border rounded" onChange={e => { const disc = parseFloat(e.target.value) || 0; const final = getFinalTotal(saleItems); const payable = (final - disc).toFixed(2); const paid = parseFloat(document.querySelector('[name="paidAmount"]')?.value) || 0; const due = (payable - paid).toFixed(2); document.getElementById('salePayableAmount').textContent = `${currency}${payable}`; document.getElementById('saleDueAmount').textContent = `${currency}${due}`; }} />
+                  <input
+                    name="absoluteDiscount"
+                    type="number"
+                    step="0.01"
+                    placeholder="Abs. Discount"
+                    className="p-2 border rounded"
+                    onChange={e => {
+                      const disc = parseFloat(e.target.value) || 0;
+                      const final = getFinalTotal(saleItems);
+                      const payable = (final - disc).toFixed(2);
+                      const paid = parseFloat(document.querySelector('[name="paidAmount"]')?.value) || 0;
+                      const due = (payable - paid).toFixed(2);
+                      document.getElementById('salePayableAmount').textContent = `${currency}${payable}`;
+                      document.getElementById('saleDueAmount').textContent = `${currency}${due}`;
+                    }}
+                  />
                   <div><strong>Payable:</strong> <span id="salePayableAmount">{currency}0</span></div>
-                  <input name="paidAmount" type="number" step="0.01" placeholder="Paid" className="p-2 border rounded" onChange={e => { const paid = parseFloat(e.target.value) || 0; const disc = parseFloat(document.querySelector('[name="absoluteDiscount"]')?.value) || 0; const final = getFinalTotal(saleItems); const payable = (final - disc).toFixed(2); const due = (payable - paid).toFixed(2); document.getElementById('saleDueAmount').textContent = `${currency}${due}`; }} />
+                  <input
+                    name="paidAmount"
+                    type="number"
+                    step="0.01"
+                    placeholder="Paid"
+                    className="p-2 border rounded"
+                    onChange={e => {
+                      const paid = parseFloat(e.target.value) || 0;
+                      const disc = parseFloat(document.querySelector('[name="absoluteDiscount"]')?.value) || 0;
+                      const final = getFinalTotal(saleItems);
+                      const payable = (final - disc).toFixed(2);
+                      const due = (payable - paid).toFixed(2);
+                      document.getElementById('saleDueAmount').textContent = `${currency}${due}`;
+                    }}
+                  />
                   <div><strong>Due:</strong> <span id="saleDueAmount">{currency}0</span></div>
                 </div>
 
                 <select name="paymentMode" className="w-full p-2 border rounded" defaultValue="cash">
-                  {Object.keys(paymentModeMap).map(m => <option key={m} value={m}>{m.replace('_', ' ')}</option>)}
+                  {Object.keys(paymentModeMap).map(m => (
+                    <option key={m} value={m}>{m.replace('_', ' ')}</option>
+                  ))}
                 </select>
 
                 <div className="flex gap-2">
                   <button type="submit" className="flex-1 bg-cyan-600 text-white py-2 rounded">Save</button>
-                  <button type="button" onClick={() => { setShowAddSale(false); setSaleItems([]); setCurrentDateTime(''); }} className="flex-1 bg-gray-300 py-2 rounded">Cancel</button>
+                  <button type="button" onClick={() => {
+                    setShowAddSale(false);
+                    setSaleItems([]);
+                    setCurrentDateTime('');
+                  }} className="flex-1 bg-gray-300 py-2 rounded">Cancel</button>
                 </div>
               </div>
             </form>

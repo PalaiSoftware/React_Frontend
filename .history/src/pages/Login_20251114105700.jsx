@@ -44,16 +44,6 @@ export default function Login() {
     if (token) navigate("/dashboard", { replace: true });
   }, [navigate]);
 
-  // ✅ Auto-hide toast after 2 seconds
-  useEffect(() => {
-    if (toast.message) {
-      const timer = setTimeout(() => {
-        setToast({ message: "", type: "" });
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
-
   const handleChange = (e) =>
     setFormData({ ...formData, [e.target.name]: e.target.value });
 
@@ -63,17 +53,12 @@ export default function Login() {
     setToast({ message: "", type: "" });
 
     try {
-      await loginUser(formData.email, formData.password);
-
+      const user = await loginUser(formData.email, formData.password);
       setToast({ message: "Login successful!", type: "success" });
-
-      // Always redirect to dashboard for all users
+      // always go to dashboard for everyone
       setTimeout(() => navigate("/dashboard"), 400);
     } catch (err) {
-      setToast({
-        message: err.message || "Invalid email or password",
-        type: "error",
-      });
+      setToast({ message: err.message || "Login failed", type: "error" });
     } finally {
       setLoading(false);
     }
@@ -81,13 +66,8 @@ export default function Login() {
 
   return (
     <div className="flex justify-center items-center min-h-[80vh] px-3 py-4">
-      <form
-        onSubmit={handleLogin}
-        className="bg-white shadow-md p-6 rounded-md w-full max-w-sm relative"
-      >
-        <h2 className="text-2xl font-semibold text-center mb-4 text-gray-800">
-          Login
-        </h2>
+      <form onSubmit={handleLogin} className="bg-white shadow-md p-6 rounded-md w-full max-w-sm relative">
+        <h2 className="text-2xl font-semibold text-center mb-4 text-gray-800">Login</h2>
 
         <input
           type="email"
@@ -118,32 +98,18 @@ export default function Login() {
         </button>
 
         <div className="text-right mt-2 mb-3 text-sm">
-          {/* <span
-            onClick={() => navigate("/forgot-password")}
-            className="text-sky-600 hover:underline cursor-pointer"
-          >
+          <span onClick={() => navigate("/forgot-password")} className="text-sky-600 hover:underline cursor-pointer">
             Forgot Password?
-          </span> */}
+          </span>
         </div>
 
         <p className="text-center text-sm mt-2">
           Don’t have an account?{" "}
-          <span
-            onClick={() => navigate("/register")}
-            className="text-sky-600 hover:underline cursor-pointer"
-          >
-            Register
-          </span>
+          <span onClick={() => navigate("/register")} className="text-sky-600 hover:underline cursor-pointer">Register</span>
         </p>
 
         {toast.message && (
-          <div
-            className={`absolute top-0 left-1/2 transform -translate-x-1/2 mt-2 px-4 py-2 rounded ${
-              toast.type === "success"
-                ? "bg-green-500 text-white"
-                : "bg-red-500 text-white"
-            }`}
-          >
+          <div className={`absolute top-0 left-1/2 transform -translate-x-1/2 mt-2 px-4 py-2 rounded ${toast.type === "success" ? "bg-green-500 text-white" : "bg-red-500 text-white"}`}>
             {toast.message}
           </div>
         )}

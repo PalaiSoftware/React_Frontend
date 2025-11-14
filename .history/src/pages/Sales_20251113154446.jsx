@@ -953,7 +953,7 @@ export default function SalesDashboard() {
                             className="w-full p-1 border rounded text-sm" 
                           />
                           <input type="hidden" id={`edit-sale-product-id-${item.id}`} value={item.product_id} />
-                          <div id={`edit-sale-suggestions-${item.id}`} className="absolute z-10 bg-white border rounded mt-1 max-h-32 overflow-y-auto w-full hidden"></div>
+                          <div id={`edit-sale-suggestions-${item.id}`} className="absolute z-10 bg-white border rounded mt-1 max-h-32 overflow-y-auto w-full "></div>
                         </td>
                         <td className="p-1"><input type="number" step="0.01" value={item.quantity} onChange={e => setEditSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, quantity: parseFloat(e.target.value) || 0 }) } : i))} className="w-16 p-1 border rounded" /></td>
                         <td className="p-1"><select className="sale-unit w-full p-1 border rounded text-sm" value={item.unit_id} onChange={e => setEditSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, unit_id: e.target.value } : i))}><option value="">Select Unit</option></select></td>

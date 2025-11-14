@@ -238,6 +238,7 @@ const Products = () => {
     if (end - start + 1 < max) start = Math.max(1, end - max + 1);
     const pages = [];
     for (let i = start; i <= end; i++) pages.push(i);
+
     return (
       <div className="flex items-center justify-center space-x-2 mt-4">
         <button
@@ -389,11 +390,12 @@ const Products = () => {
   const displayProducts = () => {
     const paginated = paginate(filteredProducts, allProductsCurrentPage);
     const canEdit = user?.rid <= 7;
+
     if (isMobile) {
       return (
         <div className="space-y-4">
           {paginated.length === 0 ? (
-            <p className="text-left py-6 text-sm text-cyan-700">
+            <p className="text-center py-6 text-sm text-cyan-700">
               {filteredProducts.length > 0
                 ? 'No products on this page'
                 : 'No products available'}
@@ -578,32 +580,32 @@ const Products = () => {
         <table className="min-w-full bg-white border">
           <thead>
             <tr>
-              <th className="py-2 px-3 sm:px-4 border text-left text-sm sm:text-base">
+              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
                 S.No
               </th>
-              <th className="py-2 px-3 sm:px-4 border text-left text-sm sm:text-base">
+              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
                 Product Name
               </th>
-              <th className="py-2 px-3 sm:px-4 border text-left text-sm sm:text-base">
+              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
                 Category
               </th>
-              <th className="py-2 px-3 sm:px-4 border text-left text-sm sm:text-base">
+              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
                 HScode
               </th>
-              <th className="py-2 px-3 sm:px-4 border text-left text-sm sm:text-base">
+              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
                 P. Unit
               </th>
-              <th className="py-2 px-3 sm:px-4 border text-left text-sm sm:text-base">
+              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
                 S. Unit
               </th>
-              <th className="py-2 px-3 sm:px-4 border text-left text-sm sm:text-base">
+              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
                 CF
               </th>
-              <th className="py-2 px-3 sm:px-4 border text-left text-sm sm:text-base">
+              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
                 Description
               </th>
               {canEdit && (
-                <th className="py-2 px-3 sm:px-4 border text-left text-sm sm:text-base">
+                <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
                   Actions
                 </th>
               )}
@@ -614,7 +616,7 @@ const Products = () => {
               <tr>
                 <td
                   colSpan={canEdit ? 9 : 8}
-                  className="py-2 px-3 sm:px-4 border text-left text-sm sm:text-base"
+                  className="py-2 px-3 sm:px-4 border text-center text-sm sm:text-base"
                 >
                   {filteredProducts.length > 0
                     ? 'No products on this page'
@@ -817,13 +819,13 @@ const Products = () => {
         <table className="min-w-full bg-white border">
           <thead>
             <tr>
-              <th className="py-2 px-3 sm:px-4 border text-left text-sm sm:text-base">
+              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
                 S.No
               </th>
-              <th className="py-2 px-3 sm:px-4 border text-left text-sm sm:text-base">
+              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
                 Unit Name
               </th>
-              <th className="py-2 px-3 sm:px-4 border text-left text-sm sm:text-base">
+              <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base">
                 Actions
               </th>
             </tr>
@@ -833,7 +835,7 @@ const Products = () => {
               <tr>
                 <td
                   colSpan={3}
-                  className="py-2 px-3 sm:px-4 border text-left text-sm sm:text-base"
+                  className="py-2 px-3 sm:px-4 border text-center text-sm sm:text-base"
                 >
                   {filteredUnits.length > 0
                     ? 'No units on this page'
@@ -882,6 +884,7 @@ const Products = () => {
         description: '',
       },
     ]);
+
     const handleAddRow = () => {
       setProductRows((prev) => [
         ...prev,
@@ -897,9 +900,11 @@ const Products = () => {
         },
       ]);
     };
+
     const handleRemoveRow = (id) => {
       setProductRows((prev) => prev.filter((r) => r.id !== id));
     };
+
     const handleInputChange = (id, field, value) => {
       setProductRows((prev) =>
         prev.map((r) => (r.id === id ? { ...r, [field]: value } : r))
@@ -909,6 +914,7 @@ const Products = () => {
         showUnitConversionPopup(unit);
       }
     };
+
     const handleSubmit = async (e) => {
       e.preventDefault();
       if (!user || !authToken) {
@@ -926,6 +932,7 @@ const Products = () => {
         c_factor: r.c_factor ? parseFloat(r.c_factor) : null,
         description: r.description ? r.description.trim() : null,
       }));
+
       products.forEach((p, i) => {
         if (!p.name) {
           showToast(`Product ${i + 1}: Name is required.`, true);
@@ -981,11 +988,13 @@ const Products = () => {
           return;
         }
       });
+
       if (hasError) return;
       if (products.length === 0) {
         showToast('No products to save. Add at least one item.', true);
         return;
       }
+
       try {
         const res = await fetch(`${API_BASE_URL}/products`, {
           method: 'POST',
@@ -1039,6 +1048,7 @@ const Products = () => {
       }
     };
 
+    /* ── MOBILE ── */
     if (isMobile) {
       return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 overflow-y-auto">
@@ -1234,6 +1244,7 @@ const Products = () => {
       );
     }
 
+    /* ── DESKTOP ── */
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
         <div className="bg-white p-4 sm:p-6 rounded shadow-lg w-full max-w-[95vw] sm:max-w-3xl md:max-w-4xl">
@@ -1251,31 +1262,31 @@ const Products = () => {
               <table className="min-w-full bg-white border">
                 <thead>
                   <tr>
-                    <th className="py-2 px-3 sm:px-4 border text-left text-sm sm:text-base w-[60px] sm:w-[80px]">
+                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base w-[60px] sm:w-[80px]">
                       S.No
                     </th>
-                    <th className="py-2 px-3 sm:px-4 border text-left text-sm sm:text-base min-w-[150px]">
+                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base min-w-[150px]">
                       Product Name
                     </th>
-                    <th className="py-2 px-3 sm:px-4 border text-left text-sm sm:text-base min-w-[120px]">
+                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base min-w-[120px]">
                       Category
                     </th>
-                    <th className="py-2 px-3 sm:px-4 border text-left text-sm sm:text-base min-w-[100px]">
+                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base min-w-[100px]">
                       HSCODE
                     </th>
-                    <th className="py-2 px-3 sm:px-4 border text-left text-sm sm:text-base min-w-[100px] sm:min-w-[120px]">
+                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base min-w-[100px] sm:min-w-[120px]">
                       P. Unit
                     </th>
-                    <th className="py-2 px-3 sm:px-4 border text-left text-sm sm:text-base min-w-[100px] sm:min-w-[120px]">
+                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base min-w-[100px] sm:min-w-[120px]">
                       S. Unit
                     </th>
-                    <th className="py-2 px-3 sm:px-4 border text-left text-sm sm:text-base min-w-[100px] sm:min-w-[120px]">
+                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base min-w-[100px] sm:min-w-[120px]">
                       CF
                     </th>
-                    <th className="py-2 px-3 sm:px-4 border text-left text-sm sm:text-base min-w-[150px]">
+                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base min-w-[150px]">
                       Description
                     </th>
-                    <th className="py-2 px-3 sm:px-4 border text-left text-sm sm:text-base w-[80px] sm:w-[100px]">
+                    <th className="py-2 px-3 sm:px-4 border text-sm sm:text-base w-[80px] sm:w-[100px]">
                       Action
                     </th>
                   </tr>
@@ -1446,6 +1457,7 @@ const Products = () => {
   /* ────────────────────── ADD CATEGORY POPUP ────────────────────── */
   const AddCategoryPopup = () => {
     const [categoryName, setCategoryName] = useState('');
+
     const handleSubmit = async (e) => {
       e.preventDefault();
       if (!user || !authToken) {
@@ -1486,6 +1498,7 @@ const Products = () => {
         showToast('Could not add the category.', true);
       }
     };
+
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
         <div className="bg-white p-4 sm:p-6 rounded shadow-lg w-full max-w-[95vw] sm:max-w-md">
@@ -1520,124 +1533,144 @@ const Products = () => {
   };
 
   /* ────────────────────── ADD UNIT POPUP ────────────────────── */
-  const AddUnitPopup = () => {
-    const [unitName, setUnitName] = useState('');
-    const handleSubmit = async (e) => {
-      e.preventDefault();
-      if (!user || !authToken) {
-        showToast('You need to log in to add a unit.', true);
-        navigate('/login');
-        return;
+/* ────────────────────── ADD UNIT POPUP (FIXED & FINAL) ────────────────────── */
+const AddUnitPopup = () => {
+  const [unitName, setUnitName] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!user || !authToken) {
+      showToast('You need to log in to add a unit.', true);
+      navigate('/login');
+      return;
+    }
+    if (!unitName.trim()) {
+      showToast('Please enter a unit name.', true);
+      return;
+    }
+    const trimmedName = unitName.trim();
+    if (units.some(u => u.name.toLowerCase() === trimmedName.toLowerCase())) {
+      showToast(`Unit "${trimmedName}" already exists.`, true);
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/add-unit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({ name: trimmedName }),
+      });
+
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(err || 'Failed to add unit');
       }
-      if (!unitName.trim()) {
-        showToast('Please enter a unit name.', true);
-        return;
+
+      const rawData = await res.json();
+      console.log('API Response:', rawData); // DEBUG: Remove later
+
+      // --- EXTRACT ID & NAME FROM ANY FORMAT ---
+      let id = null;
+      let name = trimmedName; // fallback to input
+
+      const findUnit = (obj) => {
+        if (obj?.id && obj?.name) return { id: obj.id, name: obj.name };
+        if (obj?.unit?.id) return { id: obj.unit.id, name: obj.unit.name || trimmedName };
+        if (obj?.data?.id) return { id: obj.data.id, name: obj.data.name || trimmedName };
+        if (Array.isArray(obj) && obj[0]?.id) return { id: obj[0].id, name: obj[0].name || trimmedName };
+        return null;
+      };
+
+      const unitData = findUnit(rawData);
+      if (unitData) {
+        id = unitData.id;
+        name = unitData.name;
+      } else {
+        // No ID returned → use temporary ID
+        id = Date.now();
+        console.warn('No ID from API. Using temp ID:', id);
       }
-      const trimmedName = unitName.trim();
-      if (units.some(u => u.name.toLowerCase() === trimmedName.toLowerCase())) {
-        showToast(`Unit "${trimmedName}" already exists.`, true);
-        return;
-      }
-      try {
-        const res = await fetch(`${API_BASE_URL}/add-unit`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${authToken}`,
-          },
-          body: JSON.stringify({ name: trimmedName }),
-        });
-        if (!res.ok) {
-          const err = await res.text();
-          throw new Error(err || 'Failed to add unit');
-        }
-        const rawData = await res.json();
-        let id = null;
-        let name = trimmedName;
-        const findUnit = (obj) => {
-          if (obj?.id && obj?.name) return { id: obj.id, name: obj.name };
-          if (obj?.unit?.id) return { id: obj.unit.id, name: obj.unit.name || trimmedName };
-          if (obj?.data?.id) return { id: obj.data.id, name: obj.data.name || trimmedName };
-          if (Array.isArray(obj) && obj[0]?.id) return { id: obj[0].id, name: obj[0].name || trimmedName };
-          return null;
-        };
-        const unitData = findUnit(rawData);
-        if (unitData) {
-          id = unitData.id;
-          name = unitData.name;
-        } else {
-          id = Date.now();
-          console.warn('No ID from API. Using temp ID:', id);
-        }
-        setUnits(prev => {
-          const exists = prev.some(u => u.id === id || u.name.toLowerCase() === name.toLowerCase());
-          if (exists) return prev;
-          return [...prev, { id, name }].sort((a, b) =>
-            a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
-          );
-        });
-        showToast(`Unit "${name}" added!`, false);
-        setShowAddUnitPopup(false);
-        setShowUnitSection(true);
-        setUnitsCurrentPage(1);
-        setUnitSearchTerm('');
-      } catch (e) {
-        console.error('Unit add error:', e);
-        showToast(`Could not add unit: ${e.message}`, true);
-      } finally {
-        setUnitName('');
-      }
-    };
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-        <div className="bg-white p-4 sm:p-6 rounded shadow-lg w-full max-w-[95vw] sm:max-w-md">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg sm:text-xl font-bold">Add New Unit</h2>
+
+      // --- UPDATE STATE SAFELY ---
+      setUnits(prev => {
+        const exists = prev.some(u => u.id === id || u.name.toLowerCase() === name.toLowerCase());
+        if (exists) return prev;
+        return [...prev, { id, name }].sort((a, b) =>
+          a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+        );
+      });
+
+      showToast(`Unit "${name}" added!`, false);
+
+      // --- CLOSE POPUP & SWITCH TO UNITS TAB ---
+      setShowAddUnitPopup(false);
+      setShowUnitSection(true);
+      setUnitsCurrentPage(1);
+      setUnitSearchTerm('');
+
+    } catch (e) {
+      console.error('Unit add error:', e);
+      showToast(`Could not add unit: ${e.message}`, true);
+    } finally {
+      setUnitName('');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+      <div className="bg-white p-4 sm:p-6 rounded shadow-lg w-full max-w-[95vw] sm:max-w-md">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg sm:text-xl font-bold">Add New Unit</h2>
+          <button
+            onClick={() => setShowAddUnitPopup(false)}
+            className="text-cyan-700 text-xl hover:text-red-600"
+          >
+            ×
+          </button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <input
+            type="text"
+            className="w-full border rounded px-3 py-2 text-sm sm:text-base mb-4 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            placeholder="Enter unit name (e.g., Liter)"
+            value={unitName}
+            onChange={(e) => setUnitName(e.target.value)}
+            required
+            autoFocus
+          />
+          <div className="flex space-x-2">
             <button
+              type="button"
+              className="flex-1 px-4 py-2 bg-gray-500 text-white rounded text-sm sm:text-base hover:bg-gray-600"
               onClick={() => setShowAddUnitPopup(false)}
-              className="text-cyan-700 text-xl hover:text-red-600"
             >
-              ×
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 px-4 py-2 bg-cyan-800 text-white rounded text-sm sm:text-base hover:bg-cyan-900"
+            >
+              Save Unit
             </button>
           </div>
-          <form onSubmit={handleSubmit}>
-            <input
-              type="text"
-              className="w-full border rounded px-3 py-2 text-sm sm:text-base mb-4 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-              placeholder="Enter unit name (e.g., Liter)"
-              value={unitName}
-              onChange={(e) => setUnitName(e.target.value)}
-              required
-              autoFocus
-            />
-            <div className="flex space-x-2">
-              <button
-                type="button"
-                className="flex-1 px-4 py-2 bg-gray-500 text-white rounded text-sm sm:text-base hover:bg-gray-600"
-                onClick={() => setShowAddUnitPopup(false)}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="flex-1 px-4 py-2 bg-cyan-800 text-white rounded text-sm sm:text-base hover:bg-cyan-900"
-              >
-                Save Unit
-              </button>
-            </div>
-          </form>
-        </div>
+        </form>
       </div>
-    );
-  };
+    </div>
+  );
+};
 
   /* ────────────────────── INITIAL FETCH ────────────────────── */
   useEffect(() => {
-if (!user?.id || !authToken) {      showToast('Session expired. Please log in again.', true);
+    if (!user?.id || !authToken) {
+      showToast('Session expired. Please log in again.', true);
       navigate('/login');
       return;
     }
     if (isDataFetched) return;
+
     Promise.all([fetchCategories(), fetchUnits(), fetchAllProducts()])
       .then(([cats, unis]) => {
         setCategories(cats);
@@ -1682,11 +1715,13 @@ if (!user?.id || !authToken) {      showToast('Session expired. Please log in ag
           } bg-white rounded-lg shadow-lg overflow-hidden`}
         >
           <div className="p-4 sm:p-6">
+            {/* Controls */}
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 space-y-4 lg:space-y-0">
               <h3 className="text-base sm:text-lg md:text-xl lg:text-2xl font-semibold text-left">
                 All Products List
               </h3>
               <div className="flex flex-col lg:flex-row items-start lg:items-center space-y-4 lg:space-y-0 lg:space-x-6 w-full lg:w-auto">
+                {/* Search & Category */}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 w-full lg:w-auto">
                   <div className="relative w-full sm:w-64">
                     <i className="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
@@ -1717,6 +1752,8 @@ if (!user?.id || !authToken) {      showToast('Session expired. Please log in ag
                     ))}
                   </select>
                 </div>
+
+                {/* Buttons */}
                 <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 w-full lg:w-auto">
                   {user?.rid <= 7 && (
                     <>
@@ -1737,6 +1774,8 @@ if (!user?.id || !authToken) {      showToast('Session expired. Please log in ag
                 </div>
               </div>
             </div>
+
+            {/* Table / List */}
             <div className="p-4 rounded-lg">{displayProducts()}</div>
           </div>
         </div>
@@ -1776,7 +1815,7 @@ if (!user?.id || !authToken) {      showToast('Session expired. Please log in ag
                   <button
                     className="px-4 py-2 bg-cyan-800 text-white rounded-lg text-sm sm:text-base"
                     onClick={() => {
-                      setShowUnitSection(true);
+                      setShowUnitSection(true);      // ensure we are on Units tab
                       setShowAddUnitPopup(true);
                     }}
                   >

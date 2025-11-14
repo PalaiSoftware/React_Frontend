@@ -17,6 +17,7 @@ import Sales from "./pages/Sales";
 import Purchase from "./pages/Purchase";
 import Profile from "./pages/Profile";
 import Admin from "./pages/Admin";
+import Logout from "./pages/Logout";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import GuestRoute from "./components/GuestRoute";
@@ -49,6 +50,7 @@ function App() {
           <Route path="/inventory/purchase" element={<Purchase />} />
           <Route path="/management/user" element={<User />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/logout" element={<Logout />} />
         </Route>
 
       </Routes>

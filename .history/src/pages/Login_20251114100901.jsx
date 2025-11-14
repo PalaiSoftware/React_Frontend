@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { API_BASE_URL } from "../config";
 
+// Reusable login function
 async function loginUser(email, password) {
   const res = await fetch(`${API_BASE_URL}/login`, {
     method: "POST",
@@ -26,6 +27,7 @@ async function loginUser(email, password) {
     client_name: data.client?.name,
   };
 
+  // Save token & user permanently (persists after closing tab/app)
   localStorage.setItem("authToken", data.token);
   localStorage.setItem("user", JSON.stringify(modifiedUser));
 
@@ -38,21 +40,18 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState({ message: "", type: "" });
 
-  // If user already has token, go to dashboard
+  // ---------------------------------------------------
+  // ✅ AUTO LOGIN IF TOKEN EXISTS IN LOCALSTORAGE
+  // ---------------------------------------------------
   useEffect(() => {
     const token = localStorage.getItem("authToken");
-    if (token) navigate("/dashboard", { replace: true });
-  }, [navigate]);
+    const user = localStorage.getItem("user");
 
-  // ✅ Auto-hide toast after 2 seconds
-  useEffect(() => {
-    if (toast.message) {
-      const timer = setTimeout(() => {
-        setToast({ message: "", type: "" });
-      }, 2000);
-      return () => clearTimeout(timer);
+    if (token && user) {
+      const parsed = JSON.parse(user);
+      navigate(parsed.rid >= 1 ? "/dashboard" : "/admin");
     }
-  }, [toast]);
+  }, [navigate]);
 
   const handleChange = (e) =>
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -63,17 +62,16 @@ export default function Login() {
     setToast({ message: "", type: "" });
 
     try {
-      await loginUser(formData.email, formData.password);
+      const user = await loginUser(formData.email, formData.password);
 
       setToast({ message: "Login successful!", type: "success" });
 
-      // Always redirect to dashboard for all users
-      setTimeout(() => navigate("/dashboard"), 400);
+      setTimeout(() => {
+        navigate(user.rid >= 1 ? "/dashboard" : "/admin");
+      }, 800);
+
     } catch (err) {
-      setToast({
-        message: err.message || "Invalid email or password",
-        type: "error",
-      });
+      setToast({ message: err.message, type: "error" });
     } finally {
       setLoading(false);
     }
@@ -89,6 +87,7 @@ export default function Login() {
           Login
         </h2>
 
+        {/* Email */}
         <input
           type="email"
           name="email"
@@ -99,6 +98,7 @@ export default function Login() {
           className="border w-full p-2 rounded mb-3 focus:outline-sky-500"
         />
 
+        {/* Password */}
         <input
           type="password"
           name="password"
@@ -109,6 +109,7 @@ export default function Login() {
           className="border w-full p-2 rounded mb-4 focus:outline-sky-500"
         />
 
+        {/* Submit */}
         <button
           type="submit"
           disabled={loading}
@@ -117,15 +118,17 @@ export default function Login() {
           {loading ? "Logging in..." : "Login"}
         </button>
 
+        {/* Forgot Password */}
         <div className="text-right mt-2 mb-3 text-sm">
-          {/* <span
+          <span
             onClick={() => navigate("/forgot-password")}
             className="text-sky-600 hover:underline cursor-pointer"
           >
             Forgot Password?
-          </span> */}
+          </span>
         </div>
 
+        {/* Register Link */}
         <p className="text-center text-sm mt-2">
           Don’t have an account?{" "}
           <span
@@ -136,6 +139,7 @@ export default function Login() {
           </span>
         </p>
 
+        {/* Toast Notification */}
         {toast.message && (
           <div
             className={`absolute top-0 left-1/2 transform -translate-x-1/2 mt-2 px-4 py-2 rounded ${

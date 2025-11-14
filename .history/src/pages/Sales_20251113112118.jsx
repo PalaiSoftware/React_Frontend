@@ -1,22 +1,15 @@
 'use client';
 
-// ---------------------------------------------------------------------
-// USER INFO (DO NOT MODIFY)
-// ---------------------------------------------------------------------
-// Current time: November 13, 2025 11:45 PM IST
-// Location: Airoli, Maharashtra, IN
-
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Search, Plus, Download, Edit, Trash2, Eye,
-  ChevronLeft, ChevronRight, X, Save, RotateCcw, Calculator,
-  User
+  ChevronLeft, ChevronRight, X, Save, Calculator, User
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
 
 // ---------------------------------------------------------------------
-// API Base URL
+// Payment Mode Mapping (must match backend)
 // ---------------------------------------------------------------------
 const paymentModeMap = {
   credit_card: 1, debit_card: 2, cash: 3, upi: 4,
@@ -27,24 +20,23 @@ const reversePaymentModeMap = Object.fromEntries(
 );
 
 // ---------------------------------------------------------------------
-// Helper – populate unit <select>
+// Populate Unit Dropdown
 // ---------------------------------------------------------------------
-const populateUnitDropdown = (select, units, selectedUnitId = null) => {
+const populateUnitDropdown = (select, units) => {
   if (!select) return;
-  select.innerHTML = '<option value="" disabled>Select Unit</option>';
+  select.innerHTML = '<option value="" disabled selected>Select Unit</option>';
   units.forEach(u => {
     const opt = document.createElement('option');
     opt.value = u.unit_id;
     opt.textContent = u.unit_name;
     opt.dataset.salePrice = u.sale_price;
     opt.dataset.gst = u.gst;
-    if (selectedUnitId && u.unit_id == selectedUnitId) opt.selected = true;
     select.appendChild(opt);
   });
 };
 
 // ---------------------------------------------------------------------
-// Row total calculator
+// Row Total Calculator
 // ---------------------------------------------------------------------
 const calcRowTotal = (item) => {
   const qty = Number(item.quantity) || 0;
@@ -58,9 +50,9 @@ const calcRowTotal = (item) => {
 };
 
 // ---------------------------------------------------------------------
-// handleProductSelection – works for add & edit
+// Handle Product Selection (Add & Edit)
 // ---------------------------------------------------------------------
-const handleProductSelection = async (row, productId, isEdit = false, setItems, rowId, showToast, selectedUnitId = null) => {
+const handleProductSelection = async (row, productId, isEdit = false, setItems, rowId, showToast) => {
   if (!productId) return;
   const token = localStorage.getItem('authToken');
   try {
@@ -68,11 +60,11 @@ const handleProductSelection = async (row, productId, isEdit = false, setItems, 
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
-        'Accept': 'application/json',  // Fixed: was 'astro'
+        Accept: 'application/json',
         'Content-Type': 'application/json'
       }
     });
-    if (!res.ok) throw new Error('Failed');
+    if (!res.ok) throw new Error('Failed to load units');
     const { unit_pricing } = await res.json();
     const units = Array.isArray(unit_pricing) ? unit_pricing : [];
 
@@ -81,13 +73,13 @@ const handleProductSelection = async (row, productId, isEdit = false, setItems, 
     const gstInput = row.querySelector('.sale-gst');
     const discountInput = row.querySelector('.sale-discount');
 
-    populateUnitDropdown(unitSelect, units, selectedUnitId);
+    populateUnitDropdown(unitSelect, units);
 
     if (units.length > 0) {
-      const selectedUnit = units.find(u => u.unit_id == (selectedUnitId || units[0].unit_id)) || units[0];
-      unitSelect.value = selectedUnit.unit_id;
-      costInput.value = Number(selectedUnit.sale_price || 0).toFixed(2);
-      gstInput.value = Number(selectedUnit.gst || 0).toFixed(2);
+      const first = units[0];
+      unitSelect.value = first.unit_id;
+      costInput.value = Number(first.sale_price || 0).toFixed(2);
+      gstInput.value = Number(first.gst || 0).toFixed(2);
       discountInput.value = '0.00';
 
       setItems(prev => prev.map(i =>
@@ -95,24 +87,17 @@ const handleProductSelection = async (row, productId, isEdit = false, setItems, 
           ? {
               ...i,
               product_id: productId,
-              unit_id: selectedUnit.unit_id,
-              cost: Number(selectedUnit.sale_price || 0),
-              gst: Number(selectedUnit.gst || 0),
+              unit_id: first.unit_id,
+              cost: Number(first.sale_price || 0),
+              gst: Number(first.gst || 0),
               discount: 0,
-              total: calcRowTotal({
-                ...i,
-                cost: Number(selectedUnit.sale_price || 0),
-                quantity: i.quantity || 0,
-                discount: 0,
-                gst: Number(selectedUnit.gst || 0)
-              })
+              total: calcRowTotal({ ...i, cost: Number(first.sale_price), quantity: i.quantity || 0, discount: 0, gst: Number(first.gst) })
             }
           : i
       ));
     }
 
-    // unit change handler
-    const onUnitChange = (e) => {
+    unitSelect.onchange = (e) => {
       const sel = e.target.options[e.target.selectedIndex];
       const price = Number(sel.dataset.salePrice || 0);
       const gstVal = Number(sel.dataset.gst || 0);
@@ -128,18 +113,11 @@ const handleProductSelection = async (row, productId, isEdit = false, setItems, 
               cost: price,
               gst: gstVal,
               discount: 0,
-              total: calcRowTotal({
-                ...i,
-                cost: price,
-                quantity: i.quantity || 0,
-                discount: 0,
-                gst: gstVal
-              })
+              total: calcRowTotal({ ...i, cost: price, quantity: i.quantity || 0, discount: 0, gst: gstVal })
             }
           : i
       ));
     };
-    unitSelect.onchange = onUnitChange;
   } catch (error) {
     showToast(`Failed to load units: ${error.message}`, true);
   }
@@ -169,8 +147,11 @@ export default function SalesDashboard() {
   const [editTransactionId, setEditTransactionId] = useState(null);
   const [editOriginalPaid, setEditOriginalPaid] = useState(0);
   const [editForm, setEditForm] = useState({
-    nameWithDate: '', dateTime: '', paymentMode: 'cash',
-    absoluteDiscount: 0, setPaidAmount: 0
+    bill_name: '',
+    payment_mode: 'cash',
+    absolute_discount: 0,
+    set_paid_amount: 0,
+    updated_at: ''
   });
   const [editTotals, setEditTotals] = useState({ subtotal: 0, payable: 0, due: 0 });
   const [toast, setToast] = useState(null);
@@ -203,12 +184,8 @@ export default function SalesDashboard() {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
-      if (data.status === 'success') {
-        setUserName(data.data.name);
-      } else {
-        setUserName('User');
-      }
-    } catch (err) {
+      setUserName(data.status === 'success' ? data.data.name : 'User');
+    } catch {
       setUserName('User');
     }
   };
@@ -276,17 +253,14 @@ export default function SalesDashboard() {
     }
   };
 
-  // -----------------------------------------------------------------
-  // Lazy load single sale (View)
-  // -----------------------------------------------------------------
   const fetchSaleForView = async (transactionId) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/sales/${transactionId}`, {
+      const res = await fetch(`${API_BASE_URL}/sales/transaction/${transactionId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (!res.ok) throw new Error('Failed to load sale details');
+      if (!res.ok) throw new Error('Failed to load sale');
       const result = await res.json();
-      if (result.status !== 'success') throw new Error(result.message || 'Unknown error');
+      if (result.status !== 'success') throw new Error(result.message);
       setViewSaleData(result.data);
       setShowViewSale(true);
     } catch (err) {
@@ -324,7 +298,7 @@ export default function SalesDashboard() {
   const totalPages = Math.ceil(filteredSales.length / itemsPerPage);
 
   // -----------------------------------------------------------------
-  // Calculations
+  // Totals
   // -----------------------------------------------------------------
   const getFinalTotal = (items) => {
     return items.reduce((sum, i) => sum + i.total, 0).toFixed(2);
@@ -333,8 +307,8 @@ export default function SalesDashboard() {
   useEffect(() => {
     if (showEditSale) {
       const subtotal = getFinalTotal(editSaleItems);
-      const payable = Math.max(0, subtotal - editForm.absoluteDiscount).toFixed(2);
-      const newPaid = editOriginalPaid + editForm.setPaidAmount;
+      const payable = Math.max(0, subtotal - editForm.absolute_discount).toFixed(2);
+      const newPaid = editOriginalPaid + editForm.set_paid_amount;
       const due = Math.max(0, payable - newPaid).toFixed(2);
       setEditTotals({ subtotal, payable, due });
     }
@@ -387,7 +361,7 @@ export default function SalesDashboard() {
   };
 
   // -----------------------------------------------------------------
-  // Add / Remove rows
+  // Add / Remove Rows
   // -----------------------------------------------------------------
   const addItemRow = (isEdit = false) => {
     const id = Date.now() + Math.random();
@@ -423,19 +397,14 @@ export default function SalesDashboard() {
   };
 
   // -----------------------------------------------------------------
-  // Add Sale – with `dis`, `p_price`, and proper `name`
+  // Add Sale
   // -----------------------------------------------------------------
-  const handleAddSale = async e => {
+  const handleAddSale = async (e) => {
     e.preventDefault();
     const form = e.target;
 
-    const rawName = form.nameWithDate?.value?.trim() || '';
-    const dateInput = form.saleDateTime.value;
-    if (!dateInput) return showToast('Please select date & time', true);
-
-    const formattedDate = new Date(dateInput).toISOString().slice(0, 19).replace('T', ' ');
-    const displayDate = dateInput.slice(0, 16).replace('T', ' ');
-    const nameWithDate = rawName ? `${rawName} ${displayDate}` : `Sale Bill ${displayDate}`;
+    const bill_name = (form.bill_name?.value?.trim() || '') + ' ' + new Date(form.saleDateTime.value).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }).replace(',', '');
+    const sales_date = new Date(form.saleDateTime.value).toISOString().slice(0, 19).replace('T', ' ');
 
     const itemsWithTotal = saleItems.map(i => ({
       ...i,
@@ -443,20 +412,18 @@ export default function SalesDashboard() {
     }));
 
     const payload = {
-      name: nameWithDate,
-      sales_date: formattedDate,
+      bill_name,
       customer_id: selectedCustomer.id,
       payment_mode: paymentModeMap[form.paymentMode.value],
       absolute_discount: parseFloat(form.absoluteDiscount.value) || 0,
       total_paid: parseFloat(form.paidAmount.value) || 0,
-      gst: 0,
+      sales_date,
       products: itemsWithTotal.map(i => ({
         product_id: i.product_id,
         quantity: parseFloat(i.quantity.toFixed(3)),
         unit_id: i.unit_id,
+        p_price: 0,
         s_price: parseFloat(i.cost.toFixed(2)),
-        p_price: 0,  // REQUIRED FIELD
-        discount: i.discount,
         dis: i.discount,
         gst: parseFloat(i.gst.toFixed(2))
       }))
@@ -468,13 +435,15 @@ export default function SalesDashboard() {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
-          'Accept': 'application/json'  // Fixed typo
+          Accept: 'application/json'
         },
         body: JSON.stringify(payload)
       });
 
-      const text = await res.text();
-      if (!res.ok) throw new Error(text.includes('Stock') ? 'Not enough stock!' : text || 'Save failed');
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(err.includes('Stock') ? 'Not enough stock!' : err || 'Save failed');
+      }
 
       setShowAddSale(false);
       setSaleItems([]);
@@ -483,22 +452,16 @@ export default function SalesDashboard() {
       fetchSales();
       showToast('Sale added!');
     } catch (err) {
-      showToast(err.message || 'Save failed', true);
+      showToast(err.message, true);
     }
   };
 
   // -----------------------------------------------------------------
-  // Edit Sale – open
+  // Edit Sale
   // -----------------------------------------------------------------
-  const createEmptySaleItem = () => ({
-    id: Date.now() + Math.random(),
-    product_id: '', product_name: '', quantity: 0, unit_id: '',
-    discount: 0, gst: 0, cost: 0, total: 0
-  });
-
   const openEditSale = async (transactionId) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/sales/${transactionId}`, {
+      const res = await fetch(`${API_BASE_URL}/sales/transaction/${transactionId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const { data } = await res.json();
@@ -507,32 +470,26 @@ export default function SalesDashboard() {
       setEditOriginalPaid(parseFloat(data.paid_amount) || 0);
       setSelectedCustomer({ id: data.customer_id, name: data.customer_name });
 
-      const nameParts = (data.bill_name || '').trim().split(' ');
-      const billName = nameParts.length > 5 ? nameParts.slice(0, -5).join(' ').trim() : nameParts.join(' ').trim();
-
+      const nameWithoutDate = data.bill_name.replace(/\s+\d{4}-\d{2}-\d{2}.*$/, '').trim();
       setEditForm({
-        nameWithDate: billName,
-        dateTime: data.date.slice(0, 16).replace(' ', 'T'),
-        paymentMode: reversePaymentModeMap[data.payment_mode] || 'cash',
-        absoluteDiscount: parseFloat(data.absolute_discount) || 0,
-        setPaidAmount: 0
+        bill_name: nameWithoutDate,
+        payment_mode: reversePaymentModeMap[data.payment_mode] || 'cash',
+        absolute_discount: parseFloat(data.absolute_discount) || 0,
+        set_paid_amount: 0,
+        updated_at: data.date.slice(0, 16).replace(' ', 'T')
       });
 
-      const items = (data.products || []).map(p => {
-        const id = Date.now() + Math.random();
-        return {
-          id,
-          product_id: p.product_id,
-          product_name: p.product_name,
-          quantity: parseFloat(p.quantity) || 0,
-          unit_id: p.unit_id,
-          unit_name: p.unit_name,
-          discount: parseFloat(p.discount) || 0,
-          gst: parseFloat(p.gst) || 0,
-          cost: parseFloat(p.s_price) || 0,
-          total: 0
-        };
-      });
+      const items = (data.products || []).map(p => ({
+        id: Date.now() + Math.random(),
+        product_id: p.product_id,
+        product_name: p.product_name,
+        quantity: parseFloat(p.quantity) || 0,
+        unit_id: p.unit_id,
+        discount: parseFloat(p.dis) || 0,
+        gst: parseFloat(p.gst) || 0,
+        cost: parseFloat(p.s_price) || 0,
+        total: 0
+      }));
 
       setEditSaleItems(items.length ? items : [createEmptySaleItem()]);
       setShowEditSale(true);
@@ -541,14 +498,12 @@ export default function SalesDashboard() {
         items.forEach(itm => {
           const inp = document.getElementById(`edit-sale-product-input-${itm.id}`);
           if (inp) {
-            inp.value = itm.product_name || '';
             const ref = { current: inp };
             autocompleteRefs.current[itm.id] = ref;
             setupAutocomplete(itm.id, ref, true, setEditSaleItems);
-
             const row = inp.closest('tr');
             if (row && itm.product_id) {
-              handleProductSelection(row, itm.product_id, true, setEditSaleItems, itm.id, showToast, itm.unit_id);
+              handleProductSelection(row, itm.product_id, true, setEditSaleItems, itm.id, showToast);
             }
           }
         });
@@ -558,51 +513,46 @@ export default function SalesDashboard() {
     }
   };
 
-  // -----------------------------------------------------------------
-  // saveEditedSale – with `dis` fix
-  // -----------------------------------------------------------------
+  const createEmptySaleItem = () => ({
+    id: Date.now() + Math.random(),
+    product_id: '', product_name: '', quantity: 0, unit_id: '',
+    discount: 0, gst: 0, cost: 0, total: 0
+  });
+
   const saveEditedSale = async () => {
     const validProducts = editSaleItems
       .filter(p => p.product_id && p.quantity > 0 && p.unit_id)
       .map(p => {
         const cost = parseFloat(p.cost) || 0;
-        const qty = parseFloat(p.quantity) || 0;
-        const dis = parseFloat(p.discount) || 0;
-        const gst = parseFloat(p.gst) || 0;
-
         if (cost <= 0) {
           showToast(`Invalid cost for "${p.product_name}"`, true);
           throw new Error('Invalid cost');
         }
-
         return {
           product_id: parseInt(p.product_id, 10),
-          quantity: parseFloat(qty.toFixed(3)),
+          quantity: parseFloat(p.quantity.toFixed(3)),
           p_price: 0,
           s_price: parseFloat(cost.toFixed(2)),
           unit_id: parseInt(p.unit_id, 10),
-          discount: dis,
-          dis: dis,
-          gst: gst
+          dis: p.discount,
+          gst: p.gst
         };
       });
 
-    if (validProducts.length === 0) return showToast('Add at least one valid product', true);
+    if (validProducts.length === 0) {
+      return showToast('Add at least one valid product', true);
+    }
 
-    const rawName = editForm.nameWithDate?.trim() || '';
-    const dateInput = editForm.dateTime || new Date().toISOString().slice(0, 16);
-    const displayDate = dateInput.slice(0, 16).replace('T', ' ');
-    const formattedDate = `${dateInput.replace('T', ' ')}:00`;
-    const nameWithDate = rawName ? `${rawName} ${displayDate}` : `Sale ${displayDate}`;
+    const updated_at = new Date(editForm.updated_at).toISOString().slice(0, 19).replace('T', ' ');
+    const bill_name = editForm.bill_name.trim() ? `${editForm.bill_name} ${updated_at.slice(0, 16).replace(' ', ' ')}` : updated_at;
 
     const payload = {
-      name: nameWithDate,
-      payment_mode: paymentModeMap[editForm.paymentMode] || 3,
+      bill_name,
+      payment_mode: paymentModeMap[editForm.payment_mode],
       customer_id: selectedCustomer?.id,
-      absolute_discount: parseFloat(editForm.absoluteDiscount) || 0,
-      set_paid_amount: parseFloat(editForm.setPaidAmount) || 0,
-      updated_at: formattedDate,
-      gst: 0,
+      absolute_discount: parseFloat(editForm.absolute_discount) || 0,
+      set_paid_amount: parseFloat(editForm.set_paid_amount) || 0,
+      updated_at,
       products: validProducts
     };
 
@@ -612,48 +562,47 @@ export default function SalesDashboard() {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
-          'Accept': 'application/json'  // Fixed typo
+          Accept: 'application/json'
         },
         body: JSON.stringify(payload)
       });
 
-      const text = await res.text();
       if (!res.ok) {
+        const err = await res.text();
         let msg = 'Update failed';
-        try { const err = JSON.parse(text); msg = err.message || JSON.stringify(err.errors || {}); } catch {}
+        try { const e = JSON.parse(err); msg = e.message || JSON.stringify(e.errors); } catch {}
         throw new Error(msg);
       }
 
-      showToast('Sale updated successfully');
+      showToast('Sale updated');
       setShowEditSale(false);
       setEditSaleItems([]);
-      setEditForm({ nameWithDate: '', dateTime: '', paymentMode: 'cash', absoluteDiscount: 0, setPaidAmount: 0 });
       fetchSales();
     } catch (err) {
-      showToast(err.message || 'Failed to update', true);
+      showToast(err.message, true);
     }
   };
 
   // -----------------------------------------------------------------
   // Delete & Invoice
   // -----------------------------------------------------------------
-  const deleteSale = async id => {
+  const deleteSale = async (id) => {
     if (!confirm('Delete this sale?')) return;
     try {
-      await fetch(`${API_BASE_URL}/destroy-sales/${id}`, {
+      await fetch(`${API_BASE_URL}/sales/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
       fetchSales();
       showToast('Sale deleted');
-    } catch (err) {
+    } catch {
       showToast('Delete failed', true);
     }
   };
 
-  const downloadInvoice = async id => {
+  const downloadInvoice = async (id) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/invoices/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/sales/invoice/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const blob = await res.blob();
@@ -662,7 +611,7 @@ export default function SalesDashboard() {
       a.href = url;
       a.download = `Invoice_${id}.pdf`;
       a.click();
-    } catch (err) {
+    } catch {
       showToast('Download failed', true);
     }
   };
@@ -685,20 +634,6 @@ export default function SalesDashboard() {
   };
 
   // -----------------------------------------------------------------
-  // Sync product name in edit
-  // -----------------------------------------------------------------
-  useEffect(() => {
-    if (showEditSale) {
-      editSaleItems.forEach(itm => {
-        const inp = document.getElementById(`edit-sale-product-input-${itm.id}`);
-        if (inp && inp.value !== itm.product_name) {
-          inp.value = itm.product_name || '';
-        }
-      });
-    }
-  }, [editSaleItems, showEditSale]);
-
-  // -----------------------------------------------------------------
   // Render
   // -----------------------------------------------------------------
   return (
@@ -710,14 +645,11 @@ export default function SalesDashboard() {
         </div>
       )}
 
-      {/* ==================== HEADER ==================== */}
+      {/* Header */}
       <div className="bg-gradient-to-r from-neutral-800 to-cyan-700 text-white">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <h2 className="text-2xl font-bold">Sales</h2>
-          <button
-            onClick={() => navigate('/profile')}
-            className="flex items-center gap-2 hover:bg-white/10 px-3 py-1.5 rounded-full transition-colors"
-          >
+          <button onClick={() => navigate('/profile')} className="flex items-center gap-2 hover:bg-white/10 px-3 py-1.5 rounded-full transition-colors">
             <div className="w-9 h-9 bg-white rounded-full flex items-center justify-center shadow-md">
               <User className="w-5 h-5 text-gray-800" />
             </div>
@@ -739,17 +671,13 @@ export default function SalesDashboard() {
               onChange={e => setSearchTerm(e.target.value)}
             />
           </div>
-          <button
-            onClick={() => setShowSearchCustomer(true)}
-            className="bg-cyan-600 text-white px-4 py-2 rounded-lg flex items-center gap-2"
-          >
+          <button onClick={() => setShowSearchCustomer(true)} className="bg-cyan-600 text-white px-4 py-2 rounded-lg flex items-center gap-2">
             <Plus className="w-5 h-5" /> Sale Bill
           </button>
         </div>
 
-        {/* Sales List */}
+        {/* Sales Table */}
         <div className="bg-white rounded-lg shadow overflow-hidden">
-          {/* Desktop */}
           <div className="hidden md:block">
             <table className="w-full">
               <thead className="bg-gray-50">
@@ -779,7 +707,7 @@ export default function SalesDashboard() {
                       </button>
                     </td>
                     <td className="px-4 py-3 flex gap-2">
-                      <button onClick={() => fetchSaleForView(sale.transaction_id)} className="text-blue-600 hover:text-blue-800" title="View Details">
+                      <button onClick={() => fetchSaleForView(sale.transaction_id)} className="text-blue-600 hover:text-blue-800" title="View">
                         <Eye className="w-5 h-5" />
                       </button>
                       <button onClick={() => openEditSale(sale.transaction_id)} className="text-green-600 hover:text-green-800">
@@ -795,7 +723,7 @@ export default function SalesDashboard() {
             </table>
           </div>
 
-          {/* Mobile */}
+          {/* Mobile Cards */}
           <div className="md:hidden space-y-3 p-4">
             {paginated.map((sale, i) => (
               <div key={sale.transaction_id} className="bg-white border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
@@ -805,25 +733,17 @@ export default function SalesDashboard() {
                     <p className="text-sm text-gray-600">{sale.date}</p>
                   </div>
                   <div className="flex gap-1">
-                    <button onClick={() => fetchSaleForView(sale.transaction_id)} className="p-1 text-blue-600">
-                      <Eye className="w-5 h-5" />
-                    </button>
-                    <button onClick={() => openEditSale(sale.transaction_id)} className="p-1 text-green-600">
-                      <Edit className="w-5 h-5" />
-                    </button>
-                    <button onClick={() => deleteSale(sale.transaction_id)} className="p-1 text-red-600">
-                      <Trash2 className="w-5 h-5" />
-                    </button>
+                    <button onClick={() => fetchSaleForView(sale.transaction_id)} className="p-1 text-blue-600"><Eye className="w-5 h-5" /></button>
+                    <button onClick={() => openEditSale(sale.transaction_id)} className="p-1 text-green-600"><Edit className="w-5 h-5" /></button>
+                    <button onClick={() => deleteSale(sale.transaction_id)} className="p-1 text-red-600"><Trash2 className="w-5 h-5" /></button>
                   </div>
                 </div>
-
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between"><span className="font-medium">Bill:</span><span>{sale.bill_name}</span></div>
                   <div className="flex justify-between"><span className="font-medium">Customer:</span><span>{sale.customer_name}</span></div>
                   <div className="flex justify-between"><span className="font-medium">Payment:</span><span>{reversePaymentModeMap[sale.payment_mode] || 'Cash'}</span></div>
                   <div className="flex justify-between"><span className="font-medium">Sold By:</span><span>{sale.sales_by}</span></div>
                 </div>
-
                 <div className="mt-3 flex justify-end">
                   <button onClick={() => downloadInvoice(sale.transaction_id)} className="text-cyan-600 flex items-center gap-1 text-sm">
                     <Download className="w-4 h-4" /> Invoice
@@ -842,7 +762,7 @@ export default function SalesDashboard() {
         </div>
       </div>
 
-      {/* ==================== VIEW SALE MODAL ==================== */}
+      {/* View Modal */}
       {showViewSale && viewSaleData && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg max-w-6xl w-full max-h-screen overflow-y-auto">
@@ -850,16 +770,14 @@ export default function SalesDashboard() {
               <h2 className="text-xl font-bold">Sale Details - #{viewSaleData.transaction_id}</h2>
               <button onClick={() => setShowViewSale(false)} className="text-gray-500 hover:text-gray-700"><X /></button>
             </div>
-
             <div className="p-4 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                <div><strong>Bill Name:</strong> {viewSaleData.bill_name || '-'}</div>
-                <div><strong>Customer:</strong> {viewSaleData.customer_name || '-'}</div>
-                <div><strong>Date & Time:</strong> {viewSaleData.date || '-'}</div>
-                <div><strong>Sold By:</strong> {viewSaleData.sales_by || '-'}</div>
-                <div><strong>Payment Mode:</strong> {reversePaymentModeMap[viewSaleData.payment_mode] || 'Cash'}</div>
+                <div><strong>Bill Name:</strong> {viewSaleData.bill_name}</div>
+                <div><strong>Customer:</strong> {viewSaleData.customer_name}</div>
+                <div><strong>Date:</strong> {viewSaleData.date}</div>
+                <div><strong>Sold By:</strong> {viewSaleData.sales_by}</div>
+                <div><strong>Payment:</strong> {reversePaymentModeMap[viewSaleData.payment_mode] || 'Cash'}</div>
               </div>
-
               <div className="overflow-x-auto">
                 <table className="w-full text-sm min-w-[1000px] border">
                   <thead className="bg-gray-100">
@@ -876,26 +794,25 @@ export default function SalesDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(viewSaleData.products || []).map((p, idx) => (
-                      <tr key={idx} className="border-t">
+                    {(viewSaleData.products || []).map((p, i) => (
+                      <tr key={i} className="border-t">
                         <td className="p-2 border">{p.product_name}</td>
                         <td className="p-2 border text-right">{parseFloat(p.quantity).toFixed(3)}</td>
-                        <td className="p-2 border">{p.unit_name || '-'}</td>
-                        <td className="p-2 border text-right">{currency}{parseFloat(p.selling_price).toFixed(2)}</td>
-                        <td className="p-2 border text-right">{parseFloat(p.discount).toFixed(2)}</td>
-                        <td className="p-2 border text-right">{currency}{parseFloat(p.pre_gst_total).toFixed(2)}</td>
+                        <td className="p-2 border">{p.unit_name}</td>
+                        <td className="p-2 border text-right">{currency}{parseFloat(p.s_price).toFixed(2)}</td>
+                        <td className="p-2 border text-right">{parseFloat(p.dis).toFixed(2)}</td>
+                        <td className="p-2 border text-right">{currency}{parseFloat(p.pre_gst_total || 0).toFixed(2)}</td>
                         <td className="p-2 border text-right">{parseFloat(p.gst).toFixed(2)}</td>
-                        <td className="p-2 border text-right">{currency}{parseFloat(p.gst_amount).toFixed(2)}</td>
-                        <td className="p-2 border text-right font-medium">{currency}{parseFloat(p.per_product_total).toFixed(2)}</td>
+                        <td className="p-2 border text-right">{currency}{parseFloat(p.gst_amount || 0).toFixed(2)}</td>
+                        <td className="p-2 border text-right font-medium">{currency}{parseFloat(p.per_product_total || 0).toFixed(2)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm font-medium">
                 <div><strong>Subtotal:</strong> {currency}{parseFloat(viewSaleData.total_amount || 0).toFixed(2)}</div>
-                <div><strong>Abs. Discount:</strong> {currency}{parseFloat(viewSaleData.absolute_discount || 0).toFixed(2)}</div>
+                <div><strong>Discount:</strong> {currency}{parseFloat(viewSaleData.absolute_discount || 0).toFixed(2)}</div>
                 <div><strong>Payable:</strong> {currency}{parseFloat(viewSaleData.payable_amount || 0).toFixed(2)}</div>
                 <div><strong>Paid:</strong> {currency}{parseFloat(viewSaleData.paid_amount || 0).toFixed(2)}</div>
                 <div><strong>Due:</strong> {currency}{parseFloat(viewSaleData.due_amount || 0).toFixed(2)}</div>
@@ -905,25 +822,29 @@ export default function SalesDashboard() {
         </div>
       )}
 
-      {/* ==================== EDIT SALE MODAL ==================== */}
+      {/* Edit Modal */}
       {showEditSale && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg max-w-6xl w-full max-h-screen overflow-y-auto">
             <div className="p-4 border-b flex justify-between items-center">
               <h2 className="text-xl font-bold">Edit Sale</h2>
-              <button onClick={() => { setShowEditSale(false); setEditSaleItems([]); }} className="text-gray-500 hover:text-gray-700"><X /></button>
+              <button onClick={() => setShowEditSale(false)} className="text-gray-500 hover:text-gray-700"><X /></button>
             </div>
-
             <div className="p-4 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <input 
-                  value={editForm.nameWithDate} 
-                  onChange={e => setEditForm(p => ({ ...p, nameWithDate: e.target.value }))} 
-                  placeholder="Bill Name" 
-                  className="px-3 py-2 border rounded" 
+                <input
+                  value={editForm.bill_name}
+                  onChange={e => setEditForm(p => ({ ...p, bill_name: e.target.value }))}
+                  placeholder="Bill Name (date auto-appended)"
+                  className="px-3 py-2 border rounded"
                 />
                 <input value={selectedCustomer?.name || ''} readOnly className="px-3 py-2 border rounded bg-gray-50" />
-                <input type="datetime-local" value={editForm.dateTime} onChange={e => setEditForm(p => ({ ...p, dateTime: e.target.value }))} className="px-3 py-2 border rounded" />
+                <input
+                  type="datetime-local"
+                  value={editForm.updated_at}
+                  onChange={e => setEditForm(p => ({ ...p, updated_at: e.target.value }))}
+                  className="px-3 py-2 border rounded"
+                />
               </div>
 
               <div className="overflow-x-auto">
@@ -942,61 +863,66 @@ export default function SalesDashboard() {
                   </thead>
                   <tbody>
                     {editSaleItems.map(item => (
-                      <tr key={`edit-sale-item-${item.id}`} data-row-id={item.id}>
+                      <tr key={`edit-${item.id}`} data-row-id={item.id}>
                         <td className="p-1 relative">
-                          <input 
-                            id={`edit-sale-product-input-${item.id}`} 
-                            type="text" 
-                            placeholder="Search product..." 
-                            value={item.product_name || ''} 
+                          <input
+                            id={`edit-sale-product-input-${item.id}`}
+                            type="text"
+                            placeholder="Search product..."
+                            value={item.product_name}
                             onChange={e => setEditSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, product_name: e.target.value } : i))}
-                            className="w-full p-1 border rounded text-sm" 
+                            className="w-full p-1 border rounded text-sm"
                           />
                           <input type="hidden" id={`edit-sale-product-id-${item.id}`} value={item.product_id} />
                           <div id={`edit-sale-suggestions-${item.id}`} className="absolute z-10 bg-white border rounded mt-1 max-h-32 overflow-y-auto w-full hidden"></div>
                         </td>
-                        <td className="p-1"><input type="number" step="0.01" value={item.quantity} onChange={e => setEditSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, quantity: parseFloat(e.target.value) || 0 }) } : i))} className="w-16 p-1 border rounded" /></td>
-                        <td className="p-1"><select className="sale-unit w-full p-1 border rounded text-sm" value={item.unit_id} onChange={e => setEditSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, unit_id: e.target.value } : i))}><option value="">Select Unit</option></select></td>
-                        <td className="p-1"><input type="number" className="sale-discount w-16 p-1 border rounded" value={item.discount} onChange={e => setEditSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, discount: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, discount: parseFloat(e.target.value) || 0 }) } : i))} /></td>
-                        <td className="p-1"><input type="number" className="sale-gst w-16 p-1 border rounded" value={item.gst} onChange={e => setEditSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, gst: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, gst: parseFloat(e.target.value) || 0 }) } : i))} /></td>
-                        <td className="p-1"><input type="number" step="0.01" className="sale-cost w-full p-1 border rounded" value={item.cost} onChange={e => setEditSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, cost: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, cost: parseFloat(e.target.value) || 0 }) } : i))} /></td>
+                        <td className="p-1">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={item.quantity}
+                            onChange={e => setEditSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, quantity: parseFloat(e.target.value) || 0 }) } : i))}
+                            className="w-16 p-1 border rounded"
+                          />
+                        </td>
+                        <td className="p-1">
+                          <select className="sale-unit w-full p-1 border rounded text-sm" value={item.unit_id}>
+                            <option value="">Select Unit</option>
+                          </select>
+                        </td>
+                        <td className="p-1">
+                          <input type="number" className="sale-discount w-16 p-1 border rounded" value={item.discount} onChange={e => setEditSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, discount: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, discount: parseFloat(e.target.value) || 0 }) } : i))} />
+                        </td>
+                        <td className="p-1">
+                          <input type="number" className="sale-gst w-16 p-1 border rounded" value={item.gst} onChange={e => setEditSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, gst: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, gst: parseFloat(e.target.value) || 0 }) } : i))} />
+                        </td>
+                        <td className="p-1">
+                          <input type="number" step="0.01" className="sale-cost w-full p-1 border rounded" value={item.cost} onChange={e => setEditSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, cost: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, cost: parseFloat(e.target.value) || 0 }) } : i))} />
+                        </td>
                         <td className="p-1 text-right">{currency}{item.total.toFixed(2)}</td>
-                        <td className="p-1 text-center"><button type="button" onClick={() => removeItem(item.id, true)} className="text-red-600"><X className="w-4 h-4" /></button></td>
+                        <td className="p-1 text-center">
+                          <button type="button" onClick={() => removeItem(item.id, true)} className="text-red-600"><X className="w-4 h-4" /></button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
 
-              {/* Add Item + Calculate (Right Bottom) */}
-              <div className="flex justify-between items-center mb-4">
-                <button type="button" onClick={() => addItemRow(true)} className="text-cyan-600 text-sm font-medium hover:text-cyan-700">
-                  + Add Item
-                </button>
-                <button type="button" onClick={() => setEditSaleItems(prev => prev.map(i => ({ ...i, total: calcRowTotal(i) })))} className="bg-yellow-500 text-white px-4 py-2 rounded text-sm flex items-center gap-1 shadow-md hover:bg-yellow-600">
-                  <Calculator className="w-5 h-5" /> Calculate
-                </button>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => addItemRow(true)} className="text-cyan-600 text-sm">+ Add Item</button>
+                <button type="button" onClick={() => setEditSaleItems(prev => prev.map(i => ({ ...i, total: calcRowTotal(i) })))} className="bg-yellow-500 text-white px-3 py-1 rounded text-sm flex items-center gap-1"><Calculator className="w-4 h-4" /> Calculate</button>
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
                 <div><strong>Subtotal:</strong> {currency}{editTotals.subtotal}</div>
-
-                <div>
-                  <label className="block font-medium text-gray-700 mb-1">Abs. Discount</label>
-                  <input type="number" step="0.01" value={editForm.absoluteDiscount} onChange={e => setEditForm(p => ({ ...p, absoluteDiscount: parseFloat(e.target.value) || 0 }))} className="w-full p-2 border rounded" />
-                </div>
-
+                <input type="number" step="0.01" value={editForm.absolute_discount} onChange={e => setEditForm(p => ({ ...p, absolute_discount: parseFloat(e.target.value) || 0 }))} placeholder="Abs. Discount" className="p-2 border rounded" />
                 <div><strong>Payable:</strong> {currency}{editTotals.payable}</div>
-
-                <div>
-                  <label className="block font-medium text-gray-700 mb-1">Paid</label>
-                  <input type="number" step="0.01" value={editForm.setPaidAmount} onChange={e => setEditForm(p => ({ ...p, setPaidAmount: parseFloat(e.target.value) || 0 }))} className="w-full p-2 border rounded" />
-                </div>
-
+                <input type="number" step="0.01" value={editForm.set_paid_amount} onChange={e => setEditForm(p => ({ ...p, set_paid_amount: parseFloat(e.target.value) || 0 }))} placeholder="Paid Adj." className="p-2 border rounded" />
                 <div><strong>Due:</strong> {currency}{editTotals.due}</div>
               </div>
 
-              <select value={editForm.paymentMode} onChange={e => setEditForm(p => ({ ...p, paymentMode: e.target.value }))} className="w-full md:w-64 p-2 border rounded">
+              <select value={editForm.payment_mode} onChange={e => setEditForm(p => ({ ...p, payment_mode: e.target.value }))} className="w-full md:w-64 p-2 border rounded">
                 {Object.keys(paymentModeMap).map(m => <option key={m} value={m}>{m.replace('_', ' ')}</option>)}
               </select>
 
@@ -1009,7 +935,7 @@ export default function SalesDashboard() {
         </div>
       )}
 
-      {/* ==================== SEARCH CUSTOMER MODAL ==================== */}
+      {/* Search Customer Modal */}
       {showSearchCustomer && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-screen overflow-y-auto">
@@ -1045,25 +971,24 @@ export default function SalesDashboard() {
         </div>
       )}
 
-      {/* ==================== ADD SALE MODAL ==================== */}
+      {/* Add Sale Modal */}
       {showAddSale && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg max-w-4xl w-full max-h-screen overflow-y-auto">
             <form onSubmit={handleAddSale}>
               <div className="p-4 border-b flex justify-between">
                 <h2 className="text-xl font-bold">Add New Sale</h2>
-                <button type="button" onClick={() => { setShowAddSale(false); setSaleItems([]); setCurrentDateTime(''); }}><X /></button>
+                <button type="button" onClick={() => { setShowAddSale(false); setSaleItems([]); }}><X /></button>
               </div>
-
               <div className="p-4 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <input name="nameWithDate" placeholder="Bill Name (date will be appended)" className="p-2 border rounded" />
+                  <input name="bill_name" placeholder="Bill Name (date auto-appended)" className="p-2 border rounded" />
                   <input value={selectedCustomer?.name || ''} readOnly className="p-2 border rounded bg-gray-100" />
                   <input name="saleDateTime" type="datetime-local" className="p-2 border rounded" value={currentDateTime} onChange={e => setCurrentDateTime(e.target.value)} required />
                 </div>
 
                 <div className="space-y-2">
-                  <table className="w-full text-sm" ref={saleItemsBodyRef}>
+                  <table className="w-full text-sm">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="py-2 text-left">S.No</th>
@@ -1081,49 +1006,53 @@ export default function SalesDashboard() {
                       {saleItems.map((item, index) => (
                         <tr key={item.id} data-row-id={item.id}>
                           <td className="p-1 text-center font-medium">{index + 1}</td>
-
                           <td className="p-1">
-                            <div className="autocomplete-container">
-                              <input id={`product-input-${item.id}`} type="text" placeholder="Product" className="w-full p-1 border rounded text-sm sale-product-input" value={item.product_name || ''} onChange={e => setSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, product_name: e.target.value } : i))} />
-                              <input type="hidden" id={`add-product-id-${item.id}`} className="sale-product-id" value={item.product_id} />
-                              <div id={`add-suggestions-${item.id}`} className="border rounded mt-1 max-h-32 overflow-y-auto"></div>
+                            <div className="relative">
+                              <input
+                                id={`product-input-${item.id}`}
+                                type="text"
+                                placeholder="Product"
+                                className="w-full p-1 border rounded text-sm"
+                                value={item.product_name}
+                                onChange={e => setSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, product_name: e.target.value } : i))}
+                              />
+                              <input type="hidden" id={`add-product-id-${item.id}`} value={item.product_id} />
+                              <div id={`add-suggestions-${item.id}`} className="absolute z-10 bg-white border rounded mt-1 max-h-32 overflow-y-auto w-full hidden"></div>
                             </div>
                           </td>
-
-                          <td className="p-1"><input type="number" step="0.01" value={item.quantity} onChange={e => setSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, quantity: parseFloat(e.target.value) || 0 }) } : i))} className="w-16 p-1 border rounded text-sm sale-quantity" /></td>
-
-                          <td className="p-1"><select className="sale-unit w-full p-1 border rounded text-sm"><option value="" disabled selected>Select Unit</option></select></td>
-
-                          <td className="p-1"><input type="number" className="sale-discount w-16 p-1 border rounded text-sm" value={item.discount} onChange={e => setSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, discount: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, discount: parseFloat(e.target.value) || 0 }) } : i))} /></td>
-
-                          <td className="p-1"><input type="number" className="sale-gst w-16 p-1 border rounded text-sm" value={item.gst} onChange={e => setSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, gst: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, gst: parseFloat(e.target.value) || 0 }) } : i))} /></td>
-
-                          <td className="p-1"><input id={`add-cost-${item.id}`} type="number" step="0.01" className="sale-cost w-20 p-1 border rounded text-sm" value={item.cost} onChange={e => setSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, cost: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, cost: parseFloat(e.target.value) || 0 }) } : i))} /></td>
-
-                          <td className="p-1 font-medium sale-total-cost">{currency}{item.total.toFixed(2)}</td>
-
+                          <td className="p-1">
+                            <input type="number" step="0.01" className="w-16 p-1 border rounded text-sm" value={item.quantity} onChange={e => setSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, quantity: parseFloat(e.target.value) || 0 }) } : i))} />
+                          </td>
+                          <td className="p-1">
+                            <select className="sale-unit w-full p-1 border rounded text-sm"><option value="">Select Unit</option></select>
+                          </td>
+                          <td className="p-1">
+                            <input type="number" className="sale-discount w-16 p-1 border rounded text-sm" value={item.discount} onChange={e => setSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, discount: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, discount: parseFloat(e.target.value) || 0 }) } : i))} />
+                          </td>
+                          <td className="p-1">
+                            <input type="number" className="sale-gst w-16 p-1 border rounded text-sm" value={item.gst} onChange={e => setSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, gst: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, gst: parseFloat(e.target.value) || 0 }) } : i))} />
+                          </td>
+                          <td className="p-1">
+                            <input type="number" step="0.01" className="sale-cost w-20 p-1 border rounded text-sm" value={item.cost} onChange={e => setSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, cost: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, cost: parseFloat(e.target.value) || 0 }) } : i))} />
+                          </td>
+                          <td className="p-1 font-medium">{currency}{item.total.toFixed(2)}</td>
                           <td><button type="button" onClick={() => removeItem(item.id)} className="text-red-600"><X className="w-4 h-4" /></button></td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
 
-                  {/* Add Item + Calculate (Right Bottom) */}
-                  <div className="flex justify-between items-center mt-2">
-                    <button type="button" onClick={() => addItemRow()} className="text-cyan-600 text-sm font-medium hover:text-cyan-700">
-                      + Add Item
-                    </button>
-                    <button type="button" onClick={() => setSaleItems(prev => prev.map(i => ({ ...i, total: calcRowTotal(i) })))} className="bg-yellow-500 text-white px-4 py-2 rounded text-sm flex items-center gap-1 shadow-md hover:bg-yellow-600">
-                      <Calculator className="w-5 h-5" /> Calculate
-                    </button>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => addItemRow()} className="text-cyan-600 text-sm">+ Add Item</button>
+                    <button type="button" onClick={() => setSaleItems(prev => prev.map(i => ({ ...i, total: calcRowTotal(i) })))} className="bg-yellow-500 text-white px-3 py-1 rounded text-sm flex items-center gap-1"><Calculator className="w-4 h-4" /> Calculate</button>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
-                  <div><strong>Final:</strong> <span id="saleFinalTotal">{currency}{getFinalTotal(saleItems)}</span></div>
-                  <input name="absoluteDiscount" type="number" step="0.01" placeholder="Abs. Discount" className="p-2 border rounded" onChange={e => { const disc = parseFloat(e.target.value) || 0; const final = getFinalTotal(saleItems); const payable = (final - disc).toFixed(2); const paid = parseFloat(document.querySelector('[name="paidAmount"]')?.value) || 0; const due = (payable - paid).toFixed(2); document.getElementById('salePayableAmount').textContent = `${currency}${payable}`; document.getElementById('saleDueAmount').textContent = `${currency}${due}`; }} />
+                  <div><strong>Final:</strong> <span>{currency}{getFinalTotal(saleItems)}</span></div>
+                  <input name="absoluteDiscount" type="number" step="0.01" placeholder="Abs. Discount" className="p-2 border rounded" />
                   <div><strong>Payable:</strong> <span id="salePayableAmount">{currency}0</span></div>
-                  <input name="paidAmount" type="number" step="0.01" placeholder="Paid" className="p-2 border rounded" onChange={e => { const paid = parseFloat(e.target.value) || 0; const disc = parseFloat(document.querySelector('[name="absoluteDiscount"]')?.value) || 0; const final = getFinalTotal(saleItems); const payable = (final - disc).toFixed(2); const due = (payable - paid).toFixed(2); document.getElementById('saleDueAmount').textContent = `${currency}${due}`; }} />
+                  <input name="paidAmount" type="number" step="0.01" placeholder="Paid" className="p-2 border rounded" />
                   <div><strong>Due:</strong> <span id="saleDueAmount">{currency}0</span></div>
                 </div>
 
@@ -1133,7 +1062,7 @@ export default function SalesDashboard() {
 
                 <div className="flex gap-2">
                   <button type="submit" className="flex-1 bg-cyan-600 text-white py-2 rounded">Save</button>
-                  <button type="button" onClick={() => { setShowAddSale(false); setSaleItems([]); setCurrentDateTime(''); }} className="flex-1 bg-gray-300 py-2 rounded">Cancel</button>
+                  <button type="button" onClick={() => { setShowAddSale(false); setSaleItems([]); }} className="flex-1 bg-gray-300 py-2 rounded">Cancel</button>
                 </div>
               </div>
             </form>

@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------
 // USER INFO (DO NOT MODIFY)
 // ---------------------------------------------------------------------
-// Current time: November 13, 2025 11:45 PM IST
+// Current time: November 10, 2025 04:07 PM IST
 // Location: Airoli, Maharashtra, IN
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -68,7 +68,7 @@ const handleProductSelection = async (row, productId, isEdit = false, setItems, 
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
-        'Accept': 'application/json',  // Fixed: was 'astro'
+        Accept: 'application/json',
         'Content-Type': 'application/json'
       }
     });
@@ -423,7 +423,7 @@ export default function SalesDashboard() {
   };
 
   // -----------------------------------------------------------------
-  // Add Sale – with `dis`, `p_price`, and proper `name`
+  // Add Sale – with `dis` fix
   // -----------------------------------------------------------------
   const handleAddSale = async e => {
     e.preventDefault();
@@ -435,7 +435,7 @@ export default function SalesDashboard() {
 
     const formattedDate = new Date(dateInput).toISOString().slice(0, 19).replace('T', ' ');
     const displayDate = dateInput.slice(0, 16).replace('T', ' ');
-    const nameWithDate = rawName ? `${rawName} ${displayDate}` : `Sale Bill ${displayDate}`;
+    const nameWithDate = rawName ? `${rawName} ${displayDate}` : formattedDate;
 
     const itemsWithTotal = saleItems.map(i => ({
       ...i,
@@ -455,7 +455,6 @@ export default function SalesDashboard() {
         quantity: parseFloat(i.quantity.toFixed(3)),
         unit_id: i.unit_id,
         s_price: parseFloat(i.cost.toFixed(2)),
-        p_price: 0,  // REQUIRED FIELD
         discount: i.discount,
         dis: i.discount,
         gst: parseFloat(i.gst.toFixed(2))
@@ -468,7 +467,7 @@ export default function SalesDashboard() {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
-          'Accept': 'application/json'  // Fixed typo
+          Accept: 'application/json'
         },
         body: JSON.stringify(payload)
       });
@@ -507,8 +506,9 @@ export default function SalesDashboard() {
       setEditOriginalPaid(parseFloat(data.paid_amount) || 0);
       setSelectedCustomer({ id: data.customer_id, name: data.customer_name });
 
+      // Extract bill name without date/time (last 5 parts = date)
       const nameParts = (data.bill_name || '').trim().split(' ');
-      const billName = nameParts.length > 5 ? nameParts.slice(0, -5).join(' ').trim() : nameParts.join(' ').trim();
+      const billName = nameParts.length > 5 ? nameParts.slice(0, -5).join(' ').trim() : '';
 
       setEditForm({
         nameWithDate: billName,
@@ -541,7 +541,6 @@ export default function SalesDashboard() {
         items.forEach(itm => {
           const inp = document.getElementById(`edit-sale-product-input-${itm.id}`);
           if (inp) {
-            inp.value = itm.product_name || '';
             const ref = { current: inp };
             autocompleteRefs.current[itm.id] = ref;
             setupAutocomplete(itm.id, ref, true, setEditSaleItems);
@@ -593,7 +592,7 @@ export default function SalesDashboard() {
     const dateInput = editForm.dateTime || new Date().toISOString().slice(0, 16);
     const displayDate = dateInput.slice(0, 16).replace('T', ' ');
     const formattedDate = `${dateInput.replace('T', ' ')}:00`;
-    const nameWithDate = rawName ? `${rawName} ${displayDate}` : `Sale ${displayDate}`;
+    const nameWithDate = rawName ? `${rawName} ${displayDate}` : formattedDate;
 
     const payload = {
       name: nameWithDate,
@@ -612,7 +611,7 @@ export default function SalesDashboard() {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
-          'Accept': 'application/json'  // Fixed typo
+          Accept: 'application/json'
         },
         body: JSON.stringify(payload)
       });
@@ -683,20 +682,6 @@ export default function SalesDashboard() {
     });
     setCustomers(filtered);
   };
-
-  // -----------------------------------------------------------------
-  // Sync product name in edit
-  // -----------------------------------------------------------------
-  useEffect(() => {
-    if (showEditSale) {
-      editSaleItems.forEach(itm => {
-        const inp = document.getElementById(`edit-sale-product-input-${itm.id}`);
-        if (inp && inp.value !== itm.product_name) {
-          inp.value = itm.product_name || '';
-        }
-      });
-    }
-  }, [editSaleItems, showEditSale]);
 
   // -----------------------------------------------------------------
   // Render
@@ -916,12 +901,7 @@ export default function SalesDashboard() {
 
             <div className="p-4 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <input 
-                  value={editForm.nameWithDate} 
-                  onChange={e => setEditForm(p => ({ ...p, nameWithDate: e.target.value }))} 
-                  placeholder="Bill Name" 
-                  className="px-3 py-2 border rounded" 
-                />
+                <input value={editForm.nameWithDate} onChange={e => setEditForm(p => ({ ...p, nameWithDate: e.target.value }))} placeholder="Bill Name (date will be appended)" className="px-3 py-2 border rounded" />
                 <input value={selectedCustomer?.name || ''} readOnly className="px-3 py-2 border rounded bg-gray-50" />
                 <input type="datetime-local" value={editForm.dateTime} onChange={e => setEditForm(p => ({ ...p, dateTime: e.target.value }))} className="px-3 py-2 border rounded" />
               </div>
@@ -944,14 +924,7 @@ export default function SalesDashboard() {
                     {editSaleItems.map(item => (
                       <tr key={`edit-sale-item-${item.id}`} data-row-id={item.id}>
                         <td className="p-1 relative">
-                          <input 
-                            id={`edit-sale-product-input-${item.id}`} 
-                            type="text" 
-                            placeholder="Search product..." 
-                            value={item.product_name || ''} 
-                            onChange={e => setEditSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, product_name: e.target.value } : i))}
-                            className="w-full p-1 border rounded text-sm" 
-                          />
+                          <input id={`edit-sale-product-input-${item.id}`} type="text" placeholder="Search product..." value={item.product_name || ''} onChange={e => setEditSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, product_name: e.target.value } : i))} className="w-full p-1 border rounded text-sm" />
                           <input type="hidden" id={`edit-sale-product-id-${item.id}`} value={item.product_id} />
                           <div id={`edit-sale-suggestions-${item.id}`} className="absolute z-10 bg-white border rounded mt-1 max-h-32 overflow-y-auto w-full hidden"></div>
                         </td>
@@ -968,14 +941,9 @@ export default function SalesDashboard() {
                 </table>
               </div>
 
-              {/* Add Item + Calculate (Right Bottom) */}
-              <div className="flex justify-between items-center mb-4">
-                <button type="button" onClick={() => addItemRow(true)} className="text-cyan-600 text-sm font-medium hover:text-cyan-700">
-                  + Add Item
-                </button>
-                <button type="button" onClick={() => setEditSaleItems(prev => prev.map(i => ({ ...i, total: calcRowTotal(i) })))} className="bg-yellow-500 text-white px-4 py-2 rounded text-sm flex items-center gap-1 shadow-md hover:bg-yellow-600">
-                  <Calculator className="w-5 h-5" /> Calculate
-                </button>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => addItemRow(true)} className="text-cyan-600 text-sm">+ Add Item</button>
+                <button type="button" onClick={() => setEditSaleItems(prev => prev.map(i => ({ ...i, total: calcRowTotal(i) })))} className="bg-yellow-500 text-white px-3 py-1 rounded text-sm flex items-center gap-1"><Calculator className="w-4 h-4" /> Calculate</button>
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
@@ -1090,7 +1058,7 @@ export default function SalesDashboard() {
                             </div>
                           </td>
 
-                          <td className="p-1"><input type="number" step="0.01" value={item.quantity} onChange={e => setSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, quantity: parseFloat(e.target.value) || 0 }) } : i))} className="w-16 p-1 border rounded text-sm sale-quantity" /></td>
+                          <td className="p-1"><input type="number" step="0.01" className="w-16 p-1 border rounded text-sm sale-quantity" value={item.quantity} onChange={e => setSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, quantity: parseFloat(e.target.value) || 0 }) } : i))} /></td>
 
                           <td className="p-1"><select className="sale-unit w-full p-1 border rounded text-sm"><option value="" disabled selected>Select Unit</option></select></td>
 
@@ -1108,14 +1076,9 @@ export default function SalesDashboard() {
                     </tbody>
                   </table>
 
-                  {/* Add Item + Calculate (Right Bottom) */}
-                  <div className="flex justify-between items-center mt-2">
-                    <button type="button" onClick={() => addItemRow()} className="text-cyan-600 text-sm font-medium hover:text-cyan-700">
-                      + Add Item
-                    </button>
-                    <button type="button" onClick={() => setSaleItems(prev => prev.map(i => ({ ...i, total: calcRowTotal(i) })))} className="bg-yellow-500 text-white px-4 py-2 rounded text-sm flex items-center gap-1 shadow-md hover:bg-yellow-600">
-                      <Calculator className="w-5 h-5" /> Calculate
-                    </button>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => addItemRow()} className="text-cyan-600 text-sm">+ Add Item</button>
+                    <button type="button" onClick={() => setSaleItems(prev => prev.map(i => ({ ...i, total: calcRowTotal(i) })))} className="bg-yellow-500 text-white px-3 py-1 rounded text-sm flex items-center gap-1"><Calculator className="w-4 h-4" /> Calculate</button>
                   </div>
                 </div>
 

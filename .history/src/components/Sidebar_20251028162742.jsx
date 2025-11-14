@@ -32,7 +32,7 @@ export default function Sidebar() {
     setOpenDropdown(openDropdown === menu ? null : menu);
   };
 
-  // Listen for login update (storage event)
+  // ✅ Listen for login update (storage event)
   useEffect(() => {
     const handleStorageChange = () => {
       const updatedName =
@@ -46,18 +46,12 @@ export default function Sidebar() {
     return () => window.removeEventListener("storage", handleStorageChange);
   }, []);
 
-  // ✅ UPDATED GMAIL-STYLE LOGOUT FUNCTION
   const handleLogout = () => {
     localStorage.removeItem("authToken");
     localStorage.removeItem("user");
     localStorage.removeItem("companyName");
-
-    // Force sidebar + top bar to update instantly
-    window.dispatchEvent(new Event("storage"));
-
-    // Redirect to login (like Gmail)
-    navigate("/login", { replace: true });
-
+    window.dispatchEvent(new Event("storage")); // refresh name instantly
+    navigate("/");
     setIsOpen(false);
   };
 
@@ -178,8 +172,6 @@ export default function Sidebar() {
             active={pathname === "/profile"}
             onClick={() => setIsOpen(false)}
           />
-
-          {/* Logout Button */}
           <button
             onClick={handleLogout}
             className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-red-700 hover:text-white text-white w-full"
@@ -201,7 +193,7 @@ export default function Sidebar() {
   );
 }
 
-// SidebarLink Component
+// --- SidebarLink Subcomponent ---
 function SidebarLink({ to, icon, label, active, onClick }) {
   return (
     <Link
@@ -219,7 +211,7 @@ function SidebarLink({ to, icon, label, active, onClick }) {
   );
 }
 
-// Dropdown Component
+// --- SidebarDropdown Subcomponent ---
 function SidebarDropdown({ label, icon, links, isOpen, toggle, pathname, closeSidebar }) {
   return (
     <div>

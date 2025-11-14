@@ -26,19 +26,31 @@ function App() {
     <Router>
       <Routes>
 
-        {/* Public / Auth pages (only for guests) */}
-        <Route element={<GuestRoute><AuthLayout /></GuestRoute>}>
+        {/* 👇 PUBLIC PAGES — only when user NOT logged in */}
+        <Route
+          element={
+            <GuestRoute>
+              <AuthLayout />
+            </GuestRoute>
+          }
+        >
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/contact" element={<Contact />} />
         </Route>
 
-        {/* Admin page can remain public or you can protect it later */}
+        {/* Optional: Admin page (not protected, you can protect later) */}
         <Route path="/admin" element={<Admin />} />
 
-        {/* Protected ERP area (checks only token) */}
-        <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
+        {/* 👇 PROTECTED PAGES — only when user IS logged in */}
+        <Route
+          element={
+            <ProtectedRoute>
+              <MainLayout />
+            </ProtectedRoute>
+          }
+        >
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/customers" element={<Customers />} />
           <Route path="/products" element={<Products />} />

@@ -68,7 +68,7 @@ const handleProductSelection = async (row, productId, isEdit = false, setItems, 
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
-        'Accept': 'application/json',  // Fixed: was 'astro'
+       astro: 'application/json',
         'Content-Type': 'application/json'
       }
     });
@@ -423,19 +423,19 @@ export default function SalesDashboard() {
   };
 
   // -----------------------------------------------------------------
-  // Add Sale – with `dis`, `p_price`, and proper `name`
+  // Add Sale – with `dis` fix
   // -----------------------------------------------------------------
   const handleAddSale = async e => {
     e.preventDefault();
     const form = e.target;
 
-    const rawName = form.nameWithDate?.value?.trim() || '';
+    const rawName  = form.nameWithDate?.value?.trim() || '';
     const dateInput = form.saleDateTime.value;
     if (!dateInput) return showToast('Please select date & time', true);
 
     const formattedDate = new Date(dateInput).toISOString().slice(0, 19).replace('T', ' ');
     const displayDate = dateInput.slice(0, 16).replace('T', ' ');
-    const nameWithDate = rawName ? `${rawName} ${displayDate}` : `Sale Bill ${displayDate}`;
+    const nameWithDate = rawName ? `${rawName} ${displayDate}` : formattedDate;
 
     const itemsWithTotal = saleItems.map(i => ({
       ...i,
@@ -455,7 +455,6 @@ export default function SalesDashboard() {
         quantity: parseFloat(i.quantity.toFixed(3)),
         unit_id: i.unit_id,
         s_price: parseFloat(i.cost.toFixed(2)),
-        p_price: 0,  // REQUIRED FIELD
         discount: i.discount,
         dis: i.discount,
         gst: parseFloat(i.gst.toFixed(2))
@@ -468,7 +467,7 @@ export default function SalesDashboard() {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
-          'Accept': 'application/json'  // Fixed typo
+          Accept: 'application/json'
         },
         body: JSON.stringify(payload)
       });
@@ -507,6 +506,7 @@ export default function SalesDashboard() {
       setEditOriginalPaid(parseFloat(data.paid_amount) || 0);
       setSelectedCustomer({ id: data.customer_id, name: data.customer_name });
 
+      // Extract bill name without date/time
       const nameParts = (data.bill_name || '').trim().split(' ');
       const billName = nameParts.length > 5 ? nameParts.slice(0, -5).join(' ').trim() : nameParts.join(' ').trim();
 
@@ -593,7 +593,7 @@ export default function SalesDashboard() {
     const dateInput = editForm.dateTime || new Date().toISOString().slice(0, 16);
     const displayDate = dateInput.slice(0, 16).replace('T', ' ');
     const formattedDate = `${dateInput.replace('T', ' ')}:00`;
-    const nameWithDate = rawName ? `${rawName} ${displayDate}` : `Sale ${displayDate}`;
+    const nameWithDate = rawName ? `${rawName} ${displayDate}` : formattedDate;
 
     const payload = {
       name: nameWithDate,
@@ -612,7 +612,7 @@ export default function SalesDashboard() {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
-          'Accept': 'application/json'  // Fixed typo
+          Accept: 'application/json'
         },
         body: JSON.stringify(payload)
       });
@@ -919,7 +919,7 @@ export default function SalesDashboard() {
                 <input 
                   value={editForm.nameWithDate} 
                   onChange={e => setEditForm(p => ({ ...p, nameWithDate: e.target.value }))} 
-                  placeholder="Bill Name" 
+                  placeholder="Bill Name (date will be appended)" 
                   className="px-3 py-2 border rounded" 
                 />
                 <input value={selectedCustomer?.name || ''} readOnly className="px-3 py-2 border rounded bg-gray-50" />
