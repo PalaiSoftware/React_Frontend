@@ -207,10 +207,10 @@ export default function Customer() {
         {/* Desktop Table */}
         <div className="hidden sm:block overflow-x-auto bg-white shadow-inner rounded-lg border border-gray-200">
           <table className="min-w-full divide-y divide-gray-300 table-auto">
-            <thead className="bg-gray-100">
+            <thead className="bg-gray-100 ">
               <tr>
                 {["S. No.", "Name", "Email", "Phone", "Address", "GST No", "PAN", "Actions"].map((head) => (
-                  <th key={head} className="px-2 sm:px-4 py-2 text-left text-gray-700 font-medium whitespace-nowrap">{head}</th>
+                  <th key={head} className="px-2 sm:px-4 py-2 text-left text-gray-700 font-medium whitespace-nowrap border">{head}</th>
                 ))}
               </tr>
             </thead>
@@ -244,7 +244,7 @@ export default function Customer() {
                     ) : (
                       <>
                         {["name", "email", "phone", "address", "gst_no", "pan"].map((field) => (
-                          <td key={field} className="px-2 sm:px-4 py-2">{c[field]}</td>
+                          <td key={field} className="px-2 sm:px-4 py-2 border">{c[field]}</td>
                         ))}
                         <td className="px-2 sm:px-4 py-2">
                           <button onClick={() => handleEditClick(c)} className="border border-cyan-900 text-cyan-900 px-3 py-1 rounded-md hover:bg-cyan-900 hover:text-white flex items-center justify-center gap-2">

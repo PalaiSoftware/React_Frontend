@@ -238,6 +238,7 @@ const Products = () => {
     if (end - start + 1 < max) start = Math.max(1, end - max + 1);
     const pages = [];
     for (let i = start; i <= end; i++) pages.push(i);
+
     return (
       <div className="flex items-center justify-center space-x-2 mt-4">
         <button
@@ -291,17 +292,17 @@ const Products = () => {
     );
   };
 
-  /* ────────────────────── EDIT PRODUCT ────────────────────── */
+  /* ────────────────────── EDIT PRODUCT (FIXED) ────────────────────── */
   const startEdit = useCallback((product) => {
     setEditingId(product.id);
     setEditForm({
       name: product.display_name || '',
-      category_id: product.category_id || '',
-      hscode: product.display_hscode || '',
-      p_unit: product.p_unit_id || '',
-      s_unit: product.s_unit_id || '',
+      category_id: product.category_id?.toString() || '',
+      hscode: product.display_hscode === 'N/A' ? '' : product.display_hscode,
+      p_unit: product.p_unit_id?.toString() || '',
+      s_unit: product.s_unit_id?.toString() || '',
       c_factor: product.c_factor === 'N/A' ? '' : product.c_factor,
-      description: product.description || '',
+      description: product.description === 'N/A' ? '' : product.description,
     });
   }, []);
 
@@ -315,15 +316,28 @@ const Products = () => {
       showToast('No product selected for editing.', true);
       return;
     }
+    if (!editForm.name?.trim()) {
+      showToast('Product name is required.', true);
+      return;
+    }
+    if (!editForm.category_id) {
+      showToast('Category is required.', true);
+      return;
+    }
+
+    const sUnitValue = editForm.s_unit || '';
+    const sUnit = sUnitValue === '' ? 0 : parseInt(sUnitValue, 10);
+
     const payload = {
-      name: editForm.name?.trim(),
+      name: editForm.name.trim(),
       category_id: parseInt(editForm.category_id, 10),
       hscode: editForm.hscode?.trim() || null,
       p_unit: editForm.p_unit ? parseInt(editForm.p_unit, 10) : null,
-      s_unit: editForm.s_unit ? parseInt(editForm.s_unit, 10) : null,
+      s_unit: sUnit,
       c_factor: editForm.c_factor ? parseFloat(editForm.c_factor) : null,
       description: editForm.description?.trim() || null,
     };
+
     try {
       const res = await fetch(`${API_BASE_URL}/products/${editingId}`, {
         method: 'PUT',
@@ -365,7 +379,7 @@ const Products = () => {
               a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
             )
         );
-        showToast('Product updated!');
+        showToast('Product updated!', false);
         cancelEdit();
       } else {
         let msg = 'Update failed.';
@@ -389,6 +403,7 @@ const Products = () => {
   const displayProducts = () => {
     const paginated = paginate(filteredProducts, allProductsCurrentPage);
     const canEdit = user?.rid <= 7;
+
     if (isMobile) {
       return (
         <div className="space-y-4">
@@ -475,9 +490,7 @@ const Products = () => {
                           );
                         }}
                       >
-                        <option value="" disabled>
-                          Secondary Unit
-                        </option>
+                        <option value="">Select Secondary Unit</option>
                         {units.map((u) => (
                           <option key={u.id} value={u.id}>
                             {u.name}
@@ -708,9 +721,7 @@ const Products = () => {
                               );
                             }}
                           >
-                            <option value="" disabled>
-                              Secondary Unit
-                            </option>
+                            <option value="">Select Secondary Unit</option>
                             {units.map((u) => (
                               <option key={u.id} value={u.id}>
                                 {u.name}
@@ -882,6 +893,7 @@ const Products = () => {
         description: '',
       },
     ]);
+
     const handleAddRow = () => {
       setProductRows((prev) => [
         ...prev,
@@ -897,9 +909,11 @@ const Products = () => {
         },
       ]);
     };
+
     const handleRemoveRow = (id) => {
       setProductRows((prev) => prev.filter((r) => r.id !== id));
     };
+
     const handleInputChange = (id, field, value) => {
       setProductRows((prev) =>
         prev.map((r) => (r.id === id ? { ...r, [field]: value } : r))
@@ -909,6 +923,7 @@ const Products = () => {
         showUnitConversionPopup(unit);
       }
     };
+
     const handleSubmit = async (e) => {
       e.preventDefault();
       if (!user || !authToken) {
@@ -1633,7 +1648,8 @@ const Products = () => {
 
   /* ────────────────────── INITIAL FETCH ────────────────────── */
   useEffect(() => {
-if (!user?.id || !authToken) {      showToast('Session expired. Please log in again.', true);
+    if (!user?.id || !authToken) {
+      showToast('Session expired. Please log in again.', true);
       navigate('/login');
       return;
     }
