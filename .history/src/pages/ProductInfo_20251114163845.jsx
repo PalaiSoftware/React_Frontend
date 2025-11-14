@@ -281,42 +281,41 @@ export default function ProductInfo() {
                   <th className="w-12 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
                     S.No
                   </th>
-                  <th className="w-48 border-l border-gray-200 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
+                  <th className="w-48 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
                     Product
                   </th>
-                  <th className="w-20 border-l border-gray-200 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
+                  <th className="w-20 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
                     Unit
                   </th>
-                  <th className="w-24 border-l border-gray-200 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
+                  <th className="w-24 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
                     HSN
                   </th>
                   {!isRestricted && (
                     <>
-                      <th className="w-24 border-l border-gray-200 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
+                      <th className="w-24 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
                         Purchase
                       </th>
-                      <th className="w-20 border-l border-gray-200 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
+                      <th className="w-20 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
                         Profit
                       </th>
                     </>
                   )}
-                  <th className="w-40 border-l border-gray-200 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
+                  <th className="w-40 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
                     Costs
                   </th>
-                  <th className="w-56 border-l border-gray-200 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
-                    Description
-                  </th>
-                  <th className="w-40 border-l border-gray-200 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
+                  <th className="w-40 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
                     Stocks
                   </th>
+                  <th className="w-48 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
+                    Desc
+                  </th>
                   {!isRestricted && (
-                    <th className="w-24 border-l border-gray-200 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
+                    <th className="w-24 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
                       Action
                     </th>
                   )}
                 </tr>
               </thead>
-
               <tbody className="divide-y divide-gray-200 bg-white">
                 {paginated.length === 0 ? (
                   <tr>
@@ -336,16 +335,18 @@ export default function ProductInfo() {
                         <td className={`px-6 py-4 text-sm ${colorCls}`}>{idx}</td>
 
                         {/* Product Name */}
-                        <td className={`border-l border-gray-200 px-6 py-4 text-sm font-medium ${colorCls}`}>
+                        <td className={`px-6 py-4 text-sm font-medium ${colorCls}`}>
                           {p.name}
                         </td>
 
                         {/* Unit */}
-                        <td className={`border-l border-gray-200 px-6 py-4 text-sm ${colorCls}`}>
+                        <td className={`px-6 py-4 text-sm ${colorCls}`}>
                           {isEditing ? (
                             <select
                               value={editForm.unit_name || ''}
-                              onChange={(e) => setEditForm({ ...editForm, unit_name: e.target.value })}
+                              onChange={(e) =>
+                                setEditForm({ ...editForm, unit_name: e.target.value })
+                              }
                               className="w-full rounded border px-2 py-1 text-sm"
                             >
                               <option value="">Select Unit</option>
@@ -361,12 +362,14 @@ export default function ProductInfo() {
                         </td>
 
                         {/* HSN */}
-                        <td className={`border-l border-gray-200 px-6 py-4 text-sm ${colorCls}`}>
+                        <td className={`px-6 py-4 text-sm ${colorCls}`}>
                           {isEditing ? (
                             <input
                               type="text"
                               value={editForm.hsn_code || ''}
-                              onChange={(e) => setEditForm({ ...editForm, hsn_code: e.target.value })}
+                              onChange={(e) =>
+                                setEditForm({ ...editForm, hsn_code: e.target.value })
+                              }
                               className="w-full rounded border px-2 py-1 text-sm"
                             />
                           ) : (
@@ -377,27 +380,36 @@ export default function ProductInfo() {
                         {/* Purchase / Profit */}
                         {!isRestricted && (
                           <>
-                            <td className={`border-l border-gray-200 px-6 py-4 text-sm ${colorCls}`}>
+                            <td className={`px-6 py-4 text-sm ${colorCls}`}>
                               {isEditing ? (
                                 <input
                                   type="number"
                                   step="0.01"
                                   value={editForm.purchase_price || ''}
-                                  onChange={(e) => setEditForm({ ...editForm, purchase_price: e.target.value })}
+                                  onChange={(e) =>
+                                    setEditForm({
+                                      ...editForm,
+                                      purchase_price: e.target.value,
+                                    })
+                                  }
                                   className="w-full rounded border px-2 py-1 text-sm"
                                 />
                               ) : (
                                 `₹${p.purchase_price.toFixed(2)}`
                               )}
                             </td>
-
-                            <td className={`border-l border-gray-200 px-6 py-4 text-sm ${colorCls}`}>
+                            <td className={`px-6 py-4 text-sm ${colorCls}`}>
                               {isEditing ? (
                                 <input
                                   type="number"
                                   step="0.01"
                                   value={editForm.profit_percentage || ''}
-                                  onChange={(e) => setEditForm({ ...editForm, profit_percentage: e.target.value })}
+                                  onChange={(e) =>
+                                    setEditForm({
+                                      ...editForm,
+                                      profit_percentage: e.target.value,
+                                    })
+                                  }
                                   className="w-full rounded border px-2 py-1 text-sm"
                                 />
                               ) : (
@@ -408,51 +420,65 @@ export default function ProductInfo() {
                         )}
 
                         {/* Costs */}
-                        <td className={`border-l border-gray-200 px-6 py-4 text-sm ${colorCls}`}>
+                        <td className={`px-6 py-4 text-sm ${colorCls}`}>
                           <div>Pre-GST: ₹{p.pre_gst_sale_cost.toFixed(2)}</div>
                           <div>GST: {p.gst.toFixed(2)}%</div>
                           <div>Post-GST: ₹{p.post_gst_sale_cost.toFixed(2)}</div>
                         </td>
 
-                        {/* Description */}
-                        <td className={`border-l border-gray-200 px-6 py-4 text-sm break-words whitespace-normal max-w-[22rem] ${colorCls}`}>
-                          {isEditing ? (
-                            <textarea
-                              value={editForm.description || ''}
-                              onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                              className="w-full rounded border px-2 py-1 text-sm"
-                              rows={2}
-                            />
-                          ) : (
-                            <div className="whitespace-normal break-words">{p.description}</div>
-                          )}
-                        </td>
-
                         {/* Stocks */}
-                        <td className={`border-l border-gray-200 px-6 py-4 text-sm ${colorCls}`}>
+                        <td className={`px-6 py-4 text-sm ${colorCls}`}>
                           <div>Purchase: {p.purchase_stock}</div>
                           <div>Sales: {p.sales_stock}</div>
                           <div>Current: {p.current_stock}</div>
                         </td>
 
+                        {/* Description */}
+                        <td className={`px-6 py-4 text-sm ${colorCls}`}>
+                          {isEditing ? (
+                            <textarea
+                              value={editForm.description || ''}
+                              onChange={(e) =>
+                                setEditForm({ ...editForm, description: e.target.value })
+                              }
+                              className="w-full rounded border px-2 py-1 text-sm"
+                              rows={2}
+                            />
+                          ) : (
+                            <div className="truncate">{p.description}</div>
+                          )}
+                        </td>
+
                         {/* Action */}
                         {!isRestricted && (
-                          <td className="border-l border-gray-200 px-6 py-4 text-sm">
+                          <td className="px-6 py-4 text-sm">
                             {isEditing ? (
                               <div className="flex gap-1">
-                                <button onClick={() => saveEdit(p.id)} className="text-green-600 hover:text-green-800">
+                                <button
+                                  onClick={() => saveEdit(p.id)}
+                                  className="text-green-600 hover:text-green-800"
+                                >
                                   <Save className="h-4 w-4" />
                                 </button>
-                                <button onClick={cancelEdit} className="text-gray-600 hover:text-gray-800">
+                                <button
+                                  onClick={cancelEdit}
+                                  className="text-gray-600 hover:text-gray-800"
+                                >
                                   <X className="h-4 w-4" />
                                 </button>
                               </div>
                             ) : (
                               <div className="flex gap-2">
-                                <button onClick={() => startEdit(p)} className="text-cyan-700 hover:text-blue-800">
+                                <button
+                                  onClick={() => startEdit(p)}
+                                  className="text-cyan-700 hover:text-blue-800"
+                                >
                                   <Edit className="h-4 w-4" />
                                 </button>
-                                <button onClick={() => deleteProduct(p.id)} className="text-red-600 hover:text-red-800">
+                                <button
+                                  onClick={() => deleteProduct(p.id)}
+                                  className="text-red-600 hover:text-red-800"
+                                >
                                   <Trash2 className="h-4 w-4" />
                                 </button>
                               </div>
@@ -475,14 +501,22 @@ export default function ProductInfo() {
               const colorCls = getStockColor(p.current_stock);
 
               return (
-                <div key={p.id} className={`rounded-lg bg-white p-4 shadow ${isEditing ? 'ring-2 ring-yellow-400' : ''}`}>
+                <div
+                  key={p.id}
+                  className={`rounded-lg bg-white p-4 shadow ${isEditing ? 'ring-2 ring-yellow-400' : ''}`}
+                >
                   <div className="mb-3 flex items-start justify-between">
-                    <h3 className={`text-lg font-semibold ${colorCls}`}>{idx}. {p.name}</h3>
+                    <h3 className={`text-lg font-semibold ${colorCls}`}>
+                      {idx}. {p.name}
+                    </h3>
                     {!isRestricted && (
                       <div className="flex gap-2">
                         {isEditing ? (
                           <>
-                            <button onClick={() => saveEdit(p.id)} className="text-green-600">
+                            <button
+                              onClick={() => saveEdit(p.id)}
+                              className="text-green-600"
+                            >
                               <Save className="h-5 w-5" />
                             </button>
                             <button onClick={cancelEdit} className="text-gray-600">
@@ -491,10 +525,16 @@ export default function ProductInfo() {
                           </>
                         ) : (
                           <>
-                            <button onClick={() => startEdit(p)} className="text-cyan-700">
+                            <button
+                              onClick={() => startEdit(p)}
+                              className="text-cyan-700"
+                            >
                               <Edit className="h-5 w-5" />
                             </button>
-                            <button onClick={() => deleteProduct(p.id)} className="text-red-600">
+                            <button
+                              onClick={() => deleteProduct(p.id)}
+                              className="text-red-600"
+                            >
                               <Trash2 className="h-5 w-5" />
                             </button>
                           </>
@@ -509,7 +549,9 @@ export default function ProductInfo() {
                       {isEditing ? (
                         <select
                           value={editForm.unit_name || ''}
-                          onChange={(e) => setEditForm({ ...editForm, unit_name: e.target.value })}
+                          onChange={(e) =>
+                            setEditForm({ ...editForm, unit_name: e.target.value })
+                          }
                           className="mt-1 w-full rounded border px-2 py-1 text-sm"
                         >
                           <option value="">Select Unit</option>
@@ -530,7 +572,9 @@ export default function ProductInfo() {
                         <input
                           type="text"
                           value={editForm.hsn_code || ''}
-                          onChange={(e) => setEditForm({ ...editForm, hsn_code: e.target.value })}
+                          onChange={(e) =>
+                            setEditForm({ ...editForm, hsn_code: e.target.value })
+                          }
                           className="mt-1 w-full rounded border px-2 py-1 text-sm"
                         />
                       ) : (
@@ -547,7 +591,12 @@ export default function ProductInfo() {
                               type="number"
                               step="0.01"
                               value={editForm.purchase_price || ''}
-                              onChange={(e) => setEditForm({ ...editForm, purchase_price: e.target.value })}
+                              onChange={(e) =>
+                                setEditForm({
+                                  ...editForm,
+                                  purchase_price: e.target.value,
+                                })
+                              }
                               className="mt-1 w-full rounded border px-2 py-1 text-sm"
                             />
                           ) : (
@@ -561,7 +610,12 @@ export default function ProductInfo() {
                               type="number"
                               step="0.01"
                               value={editForm.profit_percentage || ''}
-                              onChange={(e) => setEditForm({ ...editForm, profit_percentage: e.target.value })}
+                              onChange={(e) =>
+                                setEditForm({
+                                  ...editForm,
+                                  profit_percentage: e.target.value,
+                                })
+                              }
                               className="mt-1 w-full rounded border px-2 py-1 text-sm"
                             />
                           ) : (
@@ -574,25 +628,44 @@ export default function ProductInfo() {
                     <div className={colorCls}>
                       <strong>Costs:</strong>
                       <br />
-                      Pre: ₹{p.pre_gst_sale_cost.toFixed(2)} | GST: {p.gst}% | Post: ₹{p.post_gst_sale_cost.toFixed(2)}
+                      Pre: ₹{p.pre_gst_sale_cost.toFixed(2)} | GST: {p.gst}% | Post: ₹
+                      {p.post_gst_sale_cost.toFixed(2)}
                     </div>
 
                     <div className={`font-semibold ${colorCls}`}>
-                      <strong>Stocks:</strong> Purchase:{p.purchase_stock} Sales:{p.sales_stock} Current:{p.current_stock}
+                      <strong>Stocks:</strong>{' '}
+                      Purchase:{p.purchase_stock} Sales:{p.sales_stock} Current:{p.current_stock}
                     </div>
 
                     <div className={colorCls}>
-                      <strong>Description:</strong>
-                      <div className="text-xs text-gray-500 whitespace-normal break-words">{p.description}</div>
+                      <strong>Description:</strong>{' '}
+                      {isEditing ? (
+                        <textarea
+                          value={editForm.description || ''}
+                          onChange={(e) =>
+                            setEditForm({ ...editForm, description: e.target.value })
+                          }
+                          className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                          rows={2}
+                        />
+                      ) : (
+                        <span className="text-xs text-gray-500">{p.description}</span>
+                      )}
                     </div>
                   </div>
 
                   {isEditing && (
                     <div className="mt-4 flex justify-end gap-2 border-t pt-2">
-                      <button onClick={() => saveEdit(p.id)} className="rounded bg-green-600 px-3 py-1 text-sm text-white">
+                      <button
+                        onClick={() => saveEdit(p.id)}
+                        className="rounded bg-green-600 px-3 py-1 text-sm text-white"
+                      >
                         Save
                       </button>
-                      <button onClick={cancelEdit} className="rounded border px-3 py-1 text-sm">
+                      <button
+                        onClick={cancelEdit}
+                        className="rounded border px-3 py-1 text-sm"
+                      >
                         Cancel
                       </button>
                     </div>
@@ -664,9 +737,6 @@ export default function ProductInfo() {
       <style
         dangerouslySetInnerHTML={{
           __html: `
-            /* ensure description column has a fixed width and wraps without expanding table */
-            .max-w-\\[22rem\\] { max-width: 22rem; }
-            .break-words { overflow-wrap: break-word; word-break: break-word; }
             @keyframes slide-in {
               from { transform: translateX(100%); opacity: 0; }
               to   { transform: translateX(0);    opacity: 1; }

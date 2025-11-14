@@ -274,45 +274,29 @@ export default function ProductInfo() {
           </div>
 
           {/* ------------------- Desktop Table ------------------- */}
+          {/* table-fixed ensures fixed column widths so long text won't expand the whole table */}
           <div className="hidden overflow-x-auto rounded-lg bg-white shadow lg:block">
             <table className="min-w-full table-fixed divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="w-12 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
-                    S.No
-                  </th>
-                  <th className="w-48 border-l border-gray-200 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
-                    Product
-                  </th>
-                  <th className="w-20 border-l border-gray-200 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
-                    Unit
-                  </th>
-                  <th className="w-24 border-l border-gray-200 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
-                    HSN
-                  </th>
+                  <th className="w-12 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">S.No</th>
+                  <th className="w-48 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">Product</th>
+                  <th className="w-20 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">Unit</th>
+                  <th className="w-24 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">HSN</th>
                   {!isRestricted && (
                     <>
-                      <th className="w-24 border-l border-gray-200 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
-                        Purchase
-                      </th>
-                      <th className="w-20 border-l border-gray-200 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
-                        Profit
-                      </th>
+                      <th className="w-24 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">Purchase</th>
+                      <th className="w-20 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">Profit</th>
                     </>
                   )}
-                  <th className="w-40 border-l border-gray-200 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
-                    Costs
-                  </th>
-                  <th className="w-56 border-l border-gray-200 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
-                    Description
-                  </th>
-                  <th className="w-40 border-l border-gray-200 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
-                    Stocks
-                  </th>
+                  <th className="w-40 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">Costs</th>
+
+                  {/* DESCRIPTION column has fixed width and wrapping */}
+                  <th className="w-56 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">Description</th>
+
+                  <th className="w-40 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">Stocks</th>
                   {!isRestricted && (
-                    <th className="w-24 border-l border-gray-200 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">
-                      Action
-                    </th>
+                    <th className="w-24 px-6 py-3 text-left text-xs font-medium uppercase text-gray-900">Action</th>
                   )}
                 </tr>
               </thead>
@@ -320,9 +304,7 @@ export default function ProductInfo() {
               <tbody className="divide-y divide-gray-200 bg-white">
                 {paginated.length === 0 ? (
                   <tr>
-                    <td colSpan="10" className="py-8 text-center text-gray-500">
-                      No products found
-                    </td>
+                    <td colSpan="10" className="py-8 text-center text-gray-500">No products found</td>
                   </tr>
                 ) : (
                   paginated.map((p, i) => {
@@ -336,12 +318,10 @@ export default function ProductInfo() {
                         <td className={`px-6 py-4 text-sm ${colorCls}`}>{idx}</td>
 
                         {/* Product Name */}
-                        <td className={`border-l border-gray-200 px-6 py-4 text-sm font-medium ${colorCls}`}>
-                          {p.name}
-                        </td>
+                        <td className={`px-6 py-4 text-sm font-medium ${colorCls}`}>{p.name}</td>
 
                         {/* Unit */}
-                        <td className={`border-l border-gray-200 px-6 py-4 text-sm ${colorCls}`}>
+                        <td className={`px-6 py-4 text-sm ${colorCls}`}>
                           {isEditing ? (
                             <select
                               value={editForm.unit_name || ''}
@@ -349,11 +329,7 @@ export default function ProductInfo() {
                               className="w-full rounded border px-2 py-1 text-sm"
                             >
                               <option value="">Select Unit</option>
-                              {unitData.map((u) => (
-                                <option key={u.name} value={u.name}>
-                                  {u.name}
-                                </option>
-                              ))}
+                              {unitData.map((u) => <option key={u.name} value={u.name}>{u.name}</option>)}
                             </select>
                           ) : (
                             p.unit_name
@@ -361,61 +337,32 @@ export default function ProductInfo() {
                         </td>
 
                         {/* HSN */}
-                        <td className={`border-l border-gray-200 px-6 py-4 text-sm ${colorCls}`}>
-                          {isEditing ? (
-                            <input
-                              type="text"
-                              value={editForm.hsn_code || ''}
-                              onChange={(e) => setEditForm({ ...editForm, hsn_code: e.target.value })}
-                              className="w-full rounded border px-2 py-1 text-sm"
-                            />
-                          ) : (
-                            p.hsn_code
-                          )}
-                        </td>
+                        <td className={`px-6 py-4 text-sm ${colorCls}`}>{isEditing ? (
+                          <input type="text" value={editForm.hsn_code || ''} onChange={(e) => setEditForm({ ...editForm, hsn_code: e.target.value })} className="w-full rounded border px-2 py-1 text-sm" />
+                        ) : p.hsn_code}</td>
 
                         {/* Purchase / Profit */}
                         {!isRestricted && (
                           <>
-                            <td className={`border-l border-gray-200 px-6 py-4 text-sm ${colorCls}`}>
-                              {isEditing ? (
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  value={editForm.purchase_price || ''}
-                                  onChange={(e) => setEditForm({ ...editForm, purchase_price: e.target.value })}
-                                  className="w-full rounded border px-2 py-1 text-sm"
-                                />
-                              ) : (
-                                `₹${p.purchase_price.toFixed(2)}`
-                              )}
-                            </td>
+                            <td className={`px-6 py-4 text-sm ${colorCls}`}>{isEditing ? (
+                              <input type="number" step="0.01" value={editForm.purchase_price || ''} onChange={(e) => setEditForm({ ...editForm, purchase_price: e.target.value })} className="w-full rounded border px-2 py-1 text-sm" />
+                            ) : `₹${p.purchase_price.toFixed(2)}`}</td>
 
-                            <td className={`border-l border-gray-200 px-6 py-4 text-sm ${colorCls}`}>
-                              {isEditing ? (
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  value={editForm.profit_percentage || ''}
-                                  onChange={(e) => setEditForm({ ...editForm, profit_percentage: e.target.value })}
-                                  className="w-full rounded border px-2 py-1 text-sm"
-                                />
-                              ) : (
-                                `${p.profit_percentage.toFixed(2)}%`
-                              )}
-                            </td>
+                            <td className={`px-6 py-4 text-sm ${colorCls}`}>{isEditing ? (
+                              <input type="number" step="0.01" value={editForm.profit_percentage || ''} onChange={(e) => setEditForm({ ...editForm, profit_percentage: e.target.value })} className="w-full rounded border px-2 py-1 text-sm" />
+                            ) : `${p.profit_percentage.toFixed(2)}%`}</td>
                           </>
                         )}
 
                         {/* Costs */}
-                        <td className={`border-l border-gray-200 px-6 py-4 text-sm ${colorCls}`}>
+                        <td className={`px-6 py-4 text-sm ${colorCls}`}>
                           <div>Pre-GST: ₹{p.pre_gst_sale_cost.toFixed(2)}</div>
                           <div>GST: {p.gst.toFixed(2)}%</div>
                           <div>Post-GST: ₹{p.post_gst_sale_cost.toFixed(2)}</div>
                         </td>
 
-                        {/* Description */}
-                        <td className={`border-l border-gray-200 px-6 py-4 text-sm break-words whitespace-normal max-w-[22rem] ${colorCls}`}>
+                        {/* Description — fixed width, wraps, won't increase table width */}
+                        <td className={`px-6 py-4 text-sm break-words whitespace-normal max-w-[22rem] ${colorCls}`}>
                           {isEditing ? (
                             <textarea
                               value={editForm.description || ''}
@@ -429,7 +376,7 @@ export default function ProductInfo() {
                         </td>
 
                         {/* Stocks */}
-                        <td className={`border-l border-gray-200 px-6 py-4 text-sm ${colorCls}`}>
+                        <td className={`px-6 py-4 text-sm ${colorCls}`}>
                           <div>Purchase: {p.purchase_stock}</div>
                           <div>Sales: {p.sales_stock}</div>
                           <div>Current: {p.current_stock}</div>
@@ -437,24 +384,16 @@ export default function ProductInfo() {
 
                         {/* Action */}
                         {!isRestricted && (
-                          <td className="border-l border-gray-200 px-6 py-4 text-sm">
+                          <td className="px-6 py-4 text-sm">
                             {isEditing ? (
                               <div className="flex gap-1">
-                                <button onClick={() => saveEdit(p.id)} className="text-green-600 hover:text-green-800">
-                                  <Save className="h-4 w-4" />
-                                </button>
-                                <button onClick={cancelEdit} className="text-gray-600 hover:text-gray-800">
-                                  <X className="h-4 w-4" />
-                                </button>
+                                <button onClick={() => saveEdit(p.id)} className="text-green-600 hover:text-green-800"><Save className="h-4 w-4" /></button>
+                                <button onClick={cancelEdit} className="text-gray-600 hover:text-gray-800"><X className="h-4 w-4" /></button>
                               </div>
                             ) : (
                               <div className="flex gap-2">
-                                <button onClick={() => startEdit(p)} className="text-cyan-700 hover:text-blue-800">
-                                  <Edit className="h-4 w-4" />
-                                </button>
-                                <button onClick={() => deleteProduct(p.id)} className="text-red-600 hover:text-red-800">
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
+                                <button onClick={() => startEdit(p)} className="text-cyan-700 hover:text-blue-800"><Edit className="h-4 w-4" /></button>
+                                <button onClick={() => deleteProduct(p.id)} className="text-red-600 hover:text-red-800"><Trash2 className="h-4 w-4" /></button>
                               </div>
                             )}
                           </td>
@@ -482,21 +421,13 @@ export default function ProductInfo() {
                       <div className="flex gap-2">
                         {isEditing ? (
                           <>
-                            <button onClick={() => saveEdit(p.id)} className="text-green-600">
-                              <Save className="h-5 w-5" />
-                            </button>
-                            <button onClick={cancelEdit} className="text-gray-600">
-                              <X className="h-5 w-5" />
-                            </button>
+                            <button onClick={() => saveEdit(p.id)} className="text-green-600"><Save className="h-5 w-5" /></button>
+                            <button onClick={cancelEdit} className="text-gray-600"><X className="h-5 w-5" /></button>
                           </>
                         ) : (
                           <>
-                            <button onClick={() => startEdit(p)} className="text-cyan-700">
-                              <Edit className="h-5 w-5" />
-                            </button>
-                            <button onClick={() => deleteProduct(p.id)} className="text-red-600">
-                              <Trash2 className="h-5 w-5" />
-                            </button>
+                            <button onClick={() => startEdit(p)} className="text-cyan-700"><Edit className="h-5 w-5" /></button>
+                            <button onClick={() => deleteProduct(p.id)} className="text-red-600"><Trash2 className="h-5 w-5" /></button>
                           </>
                         )}
                       </div>
@@ -504,97 +435,41 @@ export default function ProductInfo() {
                   </div>
 
                   <div className="space-y-3 text-sm">
-                    <div className={colorCls}>
-                      <strong>Unit:</strong>{' '}
-                      {isEditing ? (
-                        <select
-                          value={editForm.unit_name || ''}
-                          onChange={(e) => setEditForm({ ...editForm, unit_name: e.target.value })}
-                          className="mt-1 w-full rounded border px-2 py-1 text-sm"
-                        >
-                          <option value="">Select Unit</option>
-                          {unitData.map((u) => (
-                            <option key={u.name} value={u.name}>
-                              {u.name}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        p.unit_name
-                      )}
-                    </div>
+                    <div className={colorCls}><strong>Unit:</strong> {isEditing ? (
+                      <select value={editForm.unit_name || ''} onChange={(e) => setEditForm({ ...editForm, unit_name: e.target.value })} className="mt-1 w-full rounded border px-2 py-1 text-sm">
+                        <option value="">Select Unit</option>
+                        {unitData.map((u) => <option key={u.name} value={u.name}>{u.name}</option>)}
+                      </select>
+                    ) : p.unit_name}</div>
 
-                    <div className={colorCls}>
-                      <strong>HSN:</strong>{' '}
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={editForm.hsn_code || ''}
-                          onChange={(e) => setEditForm({ ...editForm, hsn_code: e.target.value })}
-                          className="mt-1 w-full rounded border px-2 py-1 text-sm"
-                        />
-                      ) : (
-                        p.hsn_code
-                      )}
-                    </div>
+                    <div className={colorCls}><strong>HSN:</strong> {isEditing ? (
+                      <input type="text" value={editForm.hsn_code || ''} onChange={(e) => setEditForm({ ...editForm, hsn_code: e.target.value })} className="mt-1 w-full rounded border px-2 py-1 text-sm" />
+                    ) : p.hsn_code}</div>
 
                     {!isRestricted && (
                       <>
-                        <div className={colorCls}>
-                          <strong>Purchase:</strong>{' '}
-                          {isEditing ? (
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={editForm.purchase_price || ''}
-                              onChange={(e) => setEditForm({ ...editForm, purchase_price: e.target.value })}
-                              className="mt-1 w-full rounded border px-2 py-1 text-sm"
-                            />
-                          ) : (
-                            `₹${p.purchase_price.toFixed(2)}`
-                          )}
-                        </div>
-                        <div className={colorCls}>
-                          <strong>Profit:</strong>{' '}
-                          {isEditing ? (
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={editForm.profit_percentage || ''}
-                              onChange={(e) => setEditForm({ ...editForm, profit_percentage: e.target.value })}
-                              className="mt-1 w-full rounded border px-2 py-1 text-sm"
-                            />
-                          ) : (
-                            `${p.profit_percentage.toFixed(2)}%`
-                          )}
-                        </div>
+                        <div className={colorCls}><strong>Purchase:</strong> {isEditing ? (
+                          <input type="number" step="0.01" value={editForm.purchase_price || ''} onChange={(e) => setEditForm({ ...editForm, purchase_price: e.target.value })} className="mt-1 w-full rounded border px-2 py-1 text-sm" />
+                        ) : `₹${p.purchase_price.toFixed(2)}`}</div>
+                        <div className={colorCls}><strong>Profit:</strong> {isEditing ? (
+                          <input type="number" step="0.01" value={editForm.profit_percentage || ''} onChange={(e) => setEditForm({ ...editForm, profit_percentage: e.target.value })} className="mt-1 w-full rounded border px-2 py-1 text-sm" />
+                        ) : `${p.profit_percentage.toFixed(2)}%`}</div>
                       </>
                     )}
 
-                    <div className={colorCls}>
-                      <strong>Costs:</strong>
-                      <br />
-                      Pre: ₹{p.pre_gst_sale_cost.toFixed(2)} | GST: {p.gst}% | Post: ₹{p.post_gst_sale_cost.toFixed(2)}
-                    </div>
+                    <div className={colorCls}><strong>Costs:</strong><br/>Pre: ₹{p.pre_gst_sale_cost.toFixed(2)} | GST: {p.gst}% | Post: ₹{p.post_gst_sale_cost.toFixed(2)}</div>
 
-                    <div className={`font-semibold ${colorCls}`}>
-                      <strong>Stocks:</strong> Purchase:{p.purchase_stock} Sales:{p.sales_stock} Current:{p.current_stock}
-                    </div>
+                    <div className={`font-semibold ${colorCls}`}><strong>Stocks:</strong> Purchase:{p.purchase_stock} Sales:{p.sales_stock} Current:{p.current_stock}</div>
 
-                    <div className={colorCls}>
-                      <strong>Description:</strong>
+                    <div className={colorCls}><strong>Description:</strong>
                       <div className="text-xs text-gray-500 whitespace-normal break-words">{p.description}</div>
                     </div>
                   </div>
 
                   {isEditing && (
                     <div className="mt-4 flex justify-end gap-2 border-t pt-2">
-                      <button onClick={() => saveEdit(p.id)} className="rounded bg-green-600 px-3 py-1 text-sm text-white">
-                        Save
-                      </button>
-                      <button onClick={cancelEdit} className="rounded border px-3 py-1 text-sm">
-                        Cancel
-                      </button>
+                      <button onClick={() => saveEdit(p.id)} className="rounded bg-green-600 px-3 py-1 text-sm text-white">Save</button>
+                      <button onClick={cancelEdit} className="rounded border px-3 py-1 text-sm">Cancel</button>
                     </div>
                   )}
                 </div>
@@ -604,56 +479,27 @@ export default function ProductInfo() {
 
           {/* Pagination – Desktop */}
           <div className="mt-6 hidden items-center justify-between lg:flex">
-            <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className="flex items-center gap-2 rounded-lg border px-4 py-2 disabled:opacity-50"
-            >
+            <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1} className="flex items-center gap-2 rounded-lg border px-4 py-2 disabled:opacity-50">
               <ChevronLeft className="h-4 w-4" /> Prev
             </button>
-            <span className="text-sm text-gray-600">
-              Page {currentPage} of {totalPages} ({processedProducts.length} total)
-            </span>
-            <button
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className="flex items-center gap-2 rounded-lg border px-4 py-2 disabled:opacity-50"
-            >
+            <span className="text-sm text-gray-600">Page {currentPage} of {totalPages} ({processedProducts.length} total)</span>
+            <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="flex items-center gap-2 rounded-lg border px-4 py-2 disabled:opacity-50">
               Next <ChevronRight className="h-4 w-4" />
             </button>
           </div>
 
           {/* Pagination – Mobile */}
           <div className="mt-6 flex justify-center gap-4 lg:hidden">
-            <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className="rounded-lg border px-4 py-2 disabled:opacity-50"
-            >
-              Prev
-            </button>
-            <span className="self-center text-sm">
-              {currentPage} / {totalPages}
-            </span>
-            <button
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className="rounded-lg border px-4 py-2 disabled:opacity-50"
-            >
-              Next
-            </button>
+            <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1} className="rounded-lg border px-4 py-2 disabled:opacity-50">Prev</button>
+            <span className="self-center text-sm">{currentPage} / {totalPages}</span>
+            <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="rounded-lg border px-4 py-2 disabled:opacity-50">Next</button>
           </div>
         </main>
 
         {/* Toast */}
         <div className="fixed bottom-4 right-4 z-50 space-y-2">
           {toasts.map((t) => (
-            <div
-              key={t.id}
-              className={`flex items-center gap-2 rounded-lg px-4 py-3 text-white shadow-lg animate-slide-in ${
-                t.isError ? 'bg-red-600' : 'bg-green-600'
-              }`}
-            >
+            <div key={t.id} className={`flex items-center gap-2 rounded-lg px-4 py-3 text-white shadow-lg animate-slide-in ${t.isError ? 'bg-red-600' : 'bg-green-600'}`}>
               <AlertCircle className="h-5 w-5" />
               <span>{t.msg}</span>
             </div>
@@ -665,7 +511,7 @@ export default function ProductInfo() {
         dangerouslySetInnerHTML={{
           __html: `
             /* ensure description column has a fixed width and wraps without expanding table */
-            .max-w-\\[22rem\\] { max-width: 22rem; }
+            .max-w-\\[22rem\\] { max-width: 22rem; } /* tailwind-style escaped class if needed */
             .break-words { overflow-wrap: break-word; word-break: break-word; }
             @keyframes slide-in {
               from { transform: translateX(100%); opacity: 0; }

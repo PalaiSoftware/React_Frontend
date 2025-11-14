@@ -423,31 +423,6 @@ export default function SalesDashboard() {
   };
 
   // -----------------------------------------------------------------
-  // *** NEW: Real-time totals for Add-Sale modal ***
-  // -----------------------------------------------------------------
-  const updateAddSaleTotals = () => {
-    const subtotal = getFinalTotal(saleItems);
-    const absDisc = parseFloat(document.querySelector('[name="absoluteDiscount"]')?.value) || 0;
-    const paid = parseFloat(document.querySelector('[name="paidAmount"]')?.value) || 0;
-
-    const payable = Math.max(0, subtotal - absDisc).toFixed(2);
-    const due = Math.max(0, payable - paid).toFixed(2);
-
-    const finalEl = document.getElementById('saleFinalTotal');
-    const payableEl = document.getElementById('salePayableAmount');
-    const dueEl = document.getElementById('saleDueAmount');
-
-    if (finalEl) finalEl.textContent = `${currency}${subtotal}`;
-    if (payableEl) payableEl.textContent = `${currency}${payable}`;
-    if (dueEl) dueEl.textContent = `${currency}${due}`;
-  };
-
-  // Recalculate whenever items, discount or paid change
-  useEffect(() => {
-    if (showAddSale) updateAddSaleTotals();
-  }, [saleItems, showAddSale]);
-
-  // -----------------------------------------------------------------
   // Add Sale – with `dis`, `p_price`, and proper `name`
   // -----------------------------------------------------------------
   const handleAddSale = async e => {
@@ -757,7 +732,7 @@ export default function SalesDashboard() {
     <>
       {/* Toast */}
       {toast && (
-        <div className={`fixed bottom-4 right-4 pax-6 py-3 rounded-md shadow-lg z-50 text-white ${toast.error ? 'bg-red-600' : 'bg-green-600'}`}>
+        <div className={`fixed bottom-4 right-4 px-6 py-3 rounded-md shadow-lg z-50 text-white ${toast.error ? 'bg-red-600' : 'bg-green-600'}`}>
           {toast.msg}
         </div>
       )}
@@ -1165,18 +1140,18 @@ export default function SalesDashboard() {
                     <button type="button" onClick={() => addItemRow()} className="text-cyan-600 text-sm font-medium hover:text-cyan-700">
                       + Add Item
                     </button>
-                    <button type="button" onClick={updateAddSaleTotals} className="bg-yellow-500 text-white px-4 py-2 rounded text-sm flex items-center gap-1 shadow-md hover:bg-yellow-600">
+                    <button type="button" onClick={() => setSaleItems(prev => prev.map(i => ({ ...i, total: calcRowTotal(i) })))} className="bg-yellow-500 text-white px-4 py-2 rounded text-sm flex items-center gap-1 shadow-md hover:bg-yellow-600">
                       <Calculator className="w-5 h-5" /> Calculate
                     </button>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
-                  <div><strong>Final:</strong> <span id="saleFinalTotal">{currency}0.00</span></div>
-                  <input name="absoluteDiscount" type="number" step="0.01" placeholder="Abs. Discount" className="p-2 border rounded" onChange={updateAddSaleTotals} />
-                  <div><strong>Payable:</strong> <span id="salePayableAmount">{currency}0.00</span></div>
-                  <input name="paidAmount" type="number" step="0.01" placeholder="Paid" className="p-2 border rounded" onChange={updateAddSaleTotals} />
-                  <div><strong>Due:</strong> <span id="saleDueAmount">{currency}0.00</span></div>
+                  <div><strong>Final:</strong> <span id="saleFinalTotal">{currency}{getFinalTotal(saleItems)}</span></div>
+                  <input name="absoluteDiscount" type="number" step="0.01" placeholder="Abs. Discount" className="p-2 border rounded" onChange={e => { const disc = parseFloat(e.target.value) || 0; const final = getFinalTotal(saleItems); const payable = (final - disc).toFixed(2); const paid = parseFloat(document.querySelector('[name="paidAmount"]')?.value) || 0; const due = (payable - paid).toFixed(2); document.getElementById('salePayableAmount').textContent = `${currency}${payable}`; document.getElementById('saleDueAmount').textContent = `${currency}${due}`; }} />
+                  <div><strong>Payable:</strong> <span id="salePayableAmount">{currency}0</span></div>
+                  <input name="paidAmount" type="number" step="0.01" placeholder="Paid" className="p-2 border rounded" onChange={e => { const paid = parseFloat(e.target.value) || 0; const disc = parseFloat(document.querySelector('[name="absoluteDiscount"]')?.value) || 0; const final = getFinalTotal(saleItems); const payable = (final - disc).toFixed(2); const due = (payable - paid).toFixed(2); document.getElementById('saleDueAmount').textContent = `${currency}${due}`; }} />
+                  <div><strong>Due:</strong> <span id="saleDueAmount">{currency}0</span></div>
                 </div>
 
                 <select name="paymentMode" className="w-full p-2 border rounded" defaultValue="cash">
