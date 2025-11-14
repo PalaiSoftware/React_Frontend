@@ -144,12 +144,12 @@ export default function DueRecord() {
               <table className="min-w-full text-sm text-left">
                 <thead className="bg-slate-50 text-slate-600">
                   <tr>
-                    <th className="px-4 py-2">S.No</th>
-                    <th className="px-4 py-2">Customer Name</th>
-                    <th className="px-4 py-2">Total Purchase</th>
-                    <th className="px-4 py-2">Total Paid</th>
-                    <th className="px-4 py-2">Total Due</th>
-                    <th className="px-4 py-2 text-center">Action</th>
+                    <th className="px-4 py-2  border">S.No</th>
+                    <th className="px-4 py-2 border">Customer Name</th>
+                    <th className="px-4 py-2 border">Total Purchase</th>
+                    <th className="px-4 py-2 border">Total Paid</th>
+                    <th className="px-4 py-2 border">Total Due</th>
+                    <th className="px-4 py-2 border text-center">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -243,21 +243,21 @@ function DueRow({ due, index, getCurrencySymbol, fetchCustomerTransactions }) {
   return (
     <>
       <tr className="border-b hover:bg-slate-50 transition">
-        <td className="px-4 py-2">{index}</td>
-        <td className="px-4 py-2 font-medium text-slate-700">{due.customer_name}</td>
-        <td className="px-4 py-2">
+        <td className="px-4 py-2 border">{index}</td>
+        <td className="px-4 py-2 border font-medium text-slate-700">{due.customer_name}</td>
+        <td className="px-4 py-2 border">
           {getCurrencySymbol()}
           {due.total_purchase.toFixed(2)}
         </td>
-        <td className="px-4 py-2">
+        <td className="px-4 py-2 border">
           {getCurrencySymbol()}
           {due.total_paid.toFixed(2)}
         </td>
-        <td className="px-4 py-2 text-cyan-800 font-semibold">
+        <td className="px-4 py-2 text-cyan-800 font-semibold border">
           {getCurrencySymbol()}
           {due.total_due.toFixed(2)}
         </td>
-        <td className="px-4 py-2 text-center">
+        <td className="px-4 py-2 text-center border">
           <button
             onClick={toggleExpand}
             className="inline-flex items-center gap-2 px-3 py-1 border border-cyan-800 text-cyan-800 rounded-md hover:bg-cyan-800 hover:text-white transition"
@@ -374,7 +374,7 @@ function DueCard({ due, index, getCurrencySymbol, fetchCustomerTransactions }) {
             <p className="text-slate-500 italic">No transactions found.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full text-xs text-left">
+              <table className="min-w-full text-xs text-left border-collapse">
                 <thead className="bg-slate-100">
                   <tr>
                     <th className="px-2 py-1">Date</th>
