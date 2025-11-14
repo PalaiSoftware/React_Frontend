@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------
 // USER INFO (DO NOT MODIFY)
 // ---------------------------------------------------------------------
-// Current time: November 13, 2025 11:45 PM IST
+// Current time: November 13, 2025 11:15 PM IST
 // Location: Airoli, Maharashtra, IN
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -52,6 +52,7 @@ const calcRowTotal = (item) => {
   const disc = Number(item.discount) || 0;
   const gst = Number(item.gst) || 0;
   let total = qty * cost;
+ 80
   total -= total * (disc / 100);
   total += total * (gst / 100);
   return Number(total.toFixed(2));
@@ -68,7 +69,7 @@ const handleProductSelection = async (row, productId, isEdit = false, setItems, 
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
-        'Accept': 'application/json',  // Fixed: was 'astro'
+        Accept: 'application/json',
         'Content-Type': 'application/json'
       }
     });
@@ -423,7 +424,7 @@ export default function SalesDashboard() {
   };
 
   // -----------------------------------------------------------------
-  // Add Sale – with `dis`, `p_price`, and proper `name`
+  // Add Sale – with `dis` fix
   // -----------------------------------------------------------------
   const handleAddSale = async e => {
     e.preventDefault();
@@ -435,7 +436,7 @@ export default function SalesDashboard() {
 
     const formattedDate = new Date(dateInput).toISOString().slice(0, 19).replace('T', ' ');
     const displayDate = dateInput.slice(0, 16).replace('T', ' ');
-    const nameWithDate = rawName ? `${rawName} ${displayDate}` : `Sale Bill ${displayDate}`;
+    const nameWithDate = rawName ? `${rawName} ${displayDate}` : formattedDate;
 
     const itemsWithTotal = saleItems.map(i => ({
       ...i,
@@ -455,7 +456,6 @@ export default function SalesDashboard() {
         quantity: parseFloat(i.quantity.toFixed(3)),
         unit_id: i.unit_id,
         s_price: parseFloat(i.cost.toFixed(2)),
-        p_price: 0,  // REQUIRED FIELD
         discount: i.discount,
         dis: i.discount,
         gst: parseFloat(i.gst.toFixed(2))
@@ -468,7 +468,7 @@ export default function SalesDashboard() {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
-          'Accept': 'application/json'  // Fixed typo
+          Accept: 'application/json'
         },
         body: JSON.stringify(payload)
       });
@@ -507,6 +507,7 @@ export default function SalesDashboard() {
       setEditOriginalPaid(parseFloat(data.paid_amount) || 0);
       setSelectedCustomer({ id: data.customer_id, name: data.customer_name });
 
+      // Extract bill name without date/time (last 5 parts = date)
       const nameParts = (data.bill_name || '').trim().split(' ');
       const billName = nameParts.length > 5 ? nameParts.slice(0, -5).join(' ').trim() : nameParts.join(' ').trim();
 
@@ -541,7 +542,7 @@ export default function SalesDashboard() {
         items.forEach(itm => {
           const inp = document.getElementById(`edit-sale-product-input-${itm.id}`);
           if (inp) {
-            inp.value = itm.product_name || '';
+            inp.value = itm.product_name || ''; // Show product name
             const ref = { current: inp };
             autocompleteRefs.current[itm.id] = ref;
             setupAutocomplete(itm.id, ref, true, setEditSaleItems);
@@ -593,7 +594,7 @@ export default function SalesDashboard() {
     const dateInput = editForm.dateTime || new Date().toISOString().slice(0, 16);
     const displayDate = dateInput.slice(0, 16).replace('T', ' ');
     const formattedDate = `${dateInput.replace('T', ' ')}:00`;
-    const nameWithDate = rawName ? `${rawName} ${displayDate}` : `Sale ${displayDate}`;
+    const nameWithDate = rawName ? `${rawName} ${displayDate}` : formattedDate;
 
     const payload = {
       name: nameWithDate,
@@ -612,7 +613,7 @@ export default function SalesDashboard() {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
-          'Accept': 'application/json'  // Fixed typo
+          Accept: 'application/json'
         },
         body: JSON.stringify(payload)
       });
@@ -685,7 +686,7 @@ export default function SalesDashboard() {
   };
 
   // -----------------------------------------------------------------
-  // Sync product name in edit
+  // Sync product name in edit (controlled input)
   // -----------------------------------------------------------------
   useEffect(() => {
     if (showEditSale) {
@@ -919,7 +920,7 @@ export default function SalesDashboard() {
                 <input 
                   value={editForm.nameWithDate} 
                   onChange={e => setEditForm(p => ({ ...p, nameWithDate: e.target.value }))} 
-                  placeholder="Bill Name" 
+                  placeholder="Bill Name (date will be appended)" 
                   className="px-3 py-2 border rounded" 
                 />
                 <input value={selectedCustomer?.name || ''} readOnly className="px-3 py-2 border rounded bg-gray-50" />
@@ -968,11 +969,8 @@ export default function SalesDashboard() {
                 </table>
               </div>
 
-              {/* Add Item + Calculate (Right Bottom) */}
-              <div className="flex justify-between items-center mb-4">
-                <button type="button" onClick={() => addItemRow(true)} className="text-cyan-600 text-sm font-medium hover:text-cyan-700">
-                  + Add Item
-                </button>
+              {/* Calculate Button - Right Bottom */}
+              <div className="flex justify-end mb-4">
                 <button type="button" onClick={() => setEditSaleItems(prev => prev.map(i => ({ ...i, total: calcRowTotal(i) })))} className="bg-yellow-500 text-white px-4 py-2 rounded text-sm flex items-center gap-1 shadow-md hover:bg-yellow-600">
                   <Calculator className="w-5 h-5" /> Calculate
                 </button>
@@ -1108,11 +1106,8 @@ export default function SalesDashboard() {
                     </tbody>
                   </table>
 
-                  {/* Add Item + Calculate (Right Bottom) */}
-                  <div className="flex justify-between items-center mt-2">
-                    <button type="button" onClick={() => addItemRow()} className="text-cyan-600 text-sm font-medium hover:text-cyan-700">
-                      + Add Item
-                    </button>
+                  {/* Calculate Button - Right Bottom */}
+                  <div className="flex justify-end mt-2">
                     <button type="button" onClick={() => setSaleItems(prev => prev.map(i => ({ ...i, total: calcRowTotal(i) })))} className="bg-yellow-500 text-white px-4 py-2 rounded text-sm flex items-center gap-1 shadow-md hover:bg-yellow-600">
                       <Calculator className="w-5 h-5" /> Calculate
                     </button>

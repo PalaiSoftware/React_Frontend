@@ -17,6 +17,7 @@ import Sales from "./pages/Sales";
 import Purchase from "./pages/Purchase";
 import Profile from "./pages/Profile";
 import Admin from "./pages/Admin";
+import Logout from "./pages/Logout";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import GuestRoute from "./components/GuestRoute";

@@ -863,11 +863,11 @@ const Purchase = () => {
                         <td className="px-4 py-3 text-sm">{p.date}</td>
                         <td className="px-4 py-3 text-sm">{p.purchased_by || 'Unknown'}</td>
                         <td className="px-4 py-3 text-sm flex gap-2">
-                          <button onClick={() => toggleDetails(tid)} className="text-cyan-600 hover:underline">
+                          <button onClick={() => toggleDetails(tid)} className="bg-cyan-600 text-white hover:bg-cyan-700 px-3 py-1.5 rounded-md">
                             {isOpen ? 'Hide' : 'View'}
                           </button>
-                          <button onClick={() => openEdit(p.transaction_id)} className="text-green-600 hover:underline">Edit</button>
-                          <button onClick={() => deletePurchase(p.transaction_id)} className="text-red-600 hover:underline">Delete</button>
+                          <button onClick={() => openEdit(p.transaction_id)} className="bg-green-600 text-white hover:bg-green-700 px-3 py-1.5 rounded-md">Edit</button>
+                          <button onClick={() => deletePurchase(p.transaction_id)} className="bg-red-600 text-white hover:bg-red-700 px-3 py-1.5 rounded-md">Delete</button>
                         </td>
                       </tr>
                       {isOpen && details && (
@@ -947,11 +947,11 @@ const Purchase = () => {
                       <div>{p.purchased_by || 'Unknown'}</div>
                     </div>
                     <div className="mt-3 flex gap-2">
-                      <button onClick={() => toggleDetails(tid)} className="text-cyan-600 text-sm hover:underline">
+                      <button onClick={() => toggleDetails(tid)} className="bg-cyan-600 text-white hover:bg-cyan-700 px-3 py-1.5 rounded-md">
                         {isOpen ? 'Hide Details' : 'View Details'}
                       </button>
-                      <button onClick={() => openEdit(p.transaction_id)} className="text-green-600 text-sm hover:underline">Edit</button>
-                      <button onClick={() => deletePurchase(p.transaction_id)} className="text-red-600 text-sm hover:underline">Delete</button>
+                      <button onClick={() => openEdit(p.transaction_id)} className="bg-green-600 text-white hover:bg-green-700 px-3 py-1.5 rounded-md">Edit</button>
+                      <button onClick={() => deletePurchase(p.transaction_id)} className="bg-red-600 text-white hover:bg-red-700 px-3 py-1.5 rounded-md">Delete</button>
                     </div>
                     {isOpen && details && (
                       <div className="mt-4 text-xs border-t pt-3">

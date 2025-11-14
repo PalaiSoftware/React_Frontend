@@ -919,7 +919,7 @@ export default function SalesDashboard() {
                 <input 
                   value={editForm.nameWithDate} 
                   onChange={e => setEditForm(p => ({ ...p, nameWithDate: e.target.value }))} 
-                  placeholder="Bill Name" 
+                  placeholder="Bill Name (date will be appended)" 
                   className="px-3 py-2 border rounded" 
                 />
                 <input value={selectedCustomer?.name || ''} readOnly className="px-3 py-2 border rounded bg-gray-50" />

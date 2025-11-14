@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------
 // USER INFO (DO NOT MODIFY)
 // ---------------------------------------------------------------------
-// Current time: November 13, 2025 11:45 PM IST
+// Current time: November 13, 2025 11:55 PM IST
 // Location: Airoli, Maharashtra, IN
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -68,7 +68,6 @@ const handleProductSelection = async (row, productId, isEdit = false, setItems, 
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
-        'Accept': 'application/json',  // Fixed: was 'astro'
         'Content-Type': 'application/json'
       }
     });
@@ -303,7 +302,7 @@ export default function SalesDashboard() {
   }, [token, cid]);
 
   // -----------------------------------------------------------------
-  // Search & Pagination
+  // Search &...
   // -----------------------------------------------------------------
   useEffect(() => {
     const term = searchTerm.toLowerCase();
@@ -321,7 +320,7 @@ export default function SalesDashboard() {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
-  const totalPages = Math.ceil(filteredSales.length / itemsPerPage);
+  const totalPages = Math,Math.ceil(filteredSales.length / itemsPerPage);
 
   // -----------------------------------------------------------------
   // Calculations
@@ -423,7 +422,7 @@ export default function SalesDashboard() {
   };
 
   // -----------------------------------------------------------------
-  // Add Sale – with `dis`, `p_price`, and proper `name`
+  // Add Sale – with `dis` fix
   // -----------------------------------------------------------------
   const handleAddSale = async e => {
     e.preventDefault();
@@ -435,7 +434,7 @@ export default function SalesDashboard() {
 
     const formattedDate = new Date(dateInput).toISOString().slice(0, 19).replace('T', ' ');
     const displayDate = dateInput.slice(0, 16).replace('T', ' ');
-    const nameWithDate = rawName ? `${rawName} ${displayDate}` : `Sale Bill ${displayDate}`;
+    const nameWithDate = rawName ? `${rawName} ${displayDate}` : formattedDate;
 
     const itemsWithTotal = saleItems.map(i => ({
       ...i,
@@ -455,7 +454,6 @@ export default function SalesDashboard() {
         quantity: parseFloat(i.quantity.toFixed(3)),
         unit_id: i.unit_id,
         s_price: parseFloat(i.cost.toFixed(2)),
-        p_price: 0,  // REQUIRED FIELD
         discount: i.discount,
         dis: i.discount,
         gst: parseFloat(i.gst.toFixed(2))
@@ -468,7 +466,7 @@ export default function SalesDashboard() {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
-          'Accept': 'application/json'  // Fixed typo
+          Accept: 'application/json'
         },
         body: JSON.stringify(payload)
       });
@@ -593,7 +591,7 @@ export default function SalesDashboard() {
     const dateInput = editForm.dateTime || new Date().toISOString().slice(0, 16);
     const displayDate = dateInput.slice(0, 16).replace('T', ' ');
     const formattedDate = `${dateInput.replace('T', ' ')}:00`;
-    const nameWithDate = rawName ? `${rawName} ${displayDate}` : `Sale ${displayDate}`;
+    const nameWithDate = rawName ? `${rawName} ${displayDate}` : formattedDate;
 
     const payload = {
       name: nameWithDate,
@@ -612,7 +610,7 @@ export default function SalesDashboard() {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
-          'Accept': 'application/json'  // Fixed typo
+          Accept: 'application/json'
         },
         body: JSON.stringify(payload)
       });
@@ -685,14 +683,14 @@ export default function SalesDashboard() {
   };
 
   // -----------------------------------------------------------------
-  // Sync product name in edit
+  // NEW: Sync product name in Edit Sale (SHOW ON SCREEN)
   // -----------------------------------------------------------------
   useEffect(() => {
     if (showEditSale) {
-      editSaleItems.forEach(itm => {
-        const inp = document.getElementById(`edit-sale-product-input-${itm.id}`);
-        if (inp && inp.value !== itm.product_name) {
-          inp.value = itm.product_name || '';
+      editSaleItems.forEach(item => {
+        const input = document.getElementById(`edit-sale-product-input-${item.id}`);
+        if (input && input.value !== item.product_name) {
+          input.value = item.product_name || '';
         }
       });
     }
@@ -919,7 +917,7 @@ export default function SalesDashboard() {
                 <input 
                   value={editForm.nameWithDate} 
                   onChange={e => setEditForm(p => ({ ...p, nameWithDate: e.target.value }))} 
-                  placeholder="Bill Name" 
+                  placeholder="Bill Name (date will be appended)" 
                   className="px-3 py-2 border rounded" 
                 />
                 <input value={selectedCustomer?.name || ''} readOnly className="px-3 py-2 border rounded bg-gray-50" />
@@ -1124,7 +1122,7 @@ export default function SalesDashboard() {
                   <input name="absoluteDiscount" type="number" step="0.01" placeholder="Abs. Discount" className="p-2 border rounded" onChange={e => { const disc = parseFloat(e.target.value) || 0; const final = getFinalTotal(saleItems); const payable = (final - disc).toFixed(2); const paid = parseFloat(document.querySelector('[name="paidAmount"]')?.value) || 0; const due = (payable - paid).toFixed(2); document.getElementById('salePayableAmount').textContent = `${currency}${payable}`; document.getElementById('saleDueAmount').textContent = `${currency}${due}`; }} />
                   <div><strong>Payable:</strong> <span id="salePayableAmount">{currency}0</span></div>
                   <input name="paidAmount" type="number" step="0.01" placeholder="Paid" className="p-2 border rounded" onChange={e => { const paid = parseFloat(e.target.value) || 0; const disc = parseFloat(document.querySelector('[name="absoluteDiscount"]')?.value) || 0; const final = getFinalTotal(saleItems); const payable = (final - disc).toFixed(2); const due = (payable - paid).toFixed(2); document.getElementById('saleDueAmount').textContent = `${currency}${due}`; }} />
-                  <div><strong>Due:</strong> <span id="saleDueAmount">{currency}0</span></div>
+                  <div><strong>Due:</strong9 <span id="saleDueAmount">{currency}0</span></div>
                 </div>
 
                 <select name="paymentMode" className="w-full p-2 border rounded" defaultValue="cash">

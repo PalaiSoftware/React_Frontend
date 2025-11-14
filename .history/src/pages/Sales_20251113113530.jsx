@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------
 // USER INFO (DO NOT MODIFY)
 // ---------------------------------------------------------------------
-// Current time: November 13, 2025 11:45 PM IST
+// Current time: November 10, 2025 04:07 PM IST
 // Location: Airoli, Maharashtra, IN
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -18,6 +18,8 @@ import { API_BASE_URL } from '../config';
 // ---------------------------------------------------------------------
 // API Base URL
 // ---------------------------------------------------------------------
+// const API_BASE_URL = "http://127.0.0.1:8000/api";
+
 const paymentModeMap = {
   credit_card: 1, debit_card: 2, cash: 3, upi: 4,
   bank_transfer: 5, phonepe: 6
@@ -29,16 +31,15 @@ const reversePaymentModeMap = Object.fromEntries(
 // ---------------------------------------------------------------------
 // Helper – populate unit <select>
 // ---------------------------------------------------------------------
-const populateUnitDropdown = (select, units, selectedUnitId = null) => {
+const populateUnitDropdown = (select, units) => {
   if (!select) return;
-  select.innerHTML = '<option value="" disabled>Select Unit</option>';
+  select.innerHTML = '<option value="" disabled selected>Select Unit</option>';
   units.forEach(u => {
     const opt = document.createElement('option');
     opt.value = u.unit_id;
     opt.textContent = u.unit_name;
     opt.dataset.salePrice = u.sale_price;
     opt.dataset.gst = u.gst;
-    if (selectedUnitId && u.unit_id == selectedUnitId) opt.selected = true;
     select.appendChild(opt);
   });
 };
@@ -60,7 +61,7 @@ const calcRowTotal = (item) => {
 // ---------------------------------------------------------------------
 // handleProductSelection – works for add & edit
 // ---------------------------------------------------------------------
-const handleProductSelection = async (row, productId, isEdit = false, setItems, rowId, showToast, selectedUnitId = null) => {
+const handleProductSelection = async (row, productId, isEdit = false, setItems, rowId, showToast) => {
   if (!productId) return;
   const token = localStorage.getItem('authToken');
   try {
@@ -68,7 +69,7 @@ const handleProductSelection = async (row, productId, isEdit = false, setItems, 
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
-        'Accept': 'application/json',  // Fixed: was 'astro'
+        Accept: 'application/json',
         'Content-Type': 'application/json'
       }
     });
@@ -81,13 +82,13 @@ const handleProductSelection = async (row, productId, isEdit = false, setItems, 
     const gstInput = row.querySelector('.sale-gst');
     const discountInput = row.querySelector('.sale-discount');
 
-    populateUnitDropdown(unitSelect, units, selectedUnitId);
+    populateUnitDropdown(unitSelect, units);
 
     if (units.length > 0) {
-      const selectedUnit = units.find(u => u.unit_id == (selectedUnitId || units[0].unit_id)) || units[0];
-      unitSelect.value = selectedUnit.unit_id;
-      costInput.value = Number(selectedUnit.sale_price || 0).toFixed(2);
-      gstInput.value = Number(selectedUnit.gst || 0).toFixed(2);
+      const first = units[0];
+      unitSelect.value = first.unit_id;
+      costInput.value = Number(first.sale_price || 0).toFixed(2);
+      gstInput.value = Number(first.gst || 0).toFixed(2);
       discountInput.value = '0.00';
 
       setItems(prev => prev.map(i =>
@@ -95,16 +96,16 @@ const handleProductSelection = async (row, productId, isEdit = false, setItems, 
           ? {
               ...i,
               product_id: productId,
-              unit_id: selectedUnit.unit_id,
-              cost: Number(selectedUnit.sale_price || 0),
-              gst: Number(selectedUnit.gst || 0),
+              unit_id: first.unit_id,
+              cost: Number(first.sale_price || 0),
+              gst: Number(first.gst || 0),
               discount: 0,
               total: calcRowTotal({
                 ...i,
-                cost: Number(selectedUnit.sale_price || 0),
+                cost: Number(first.sale_price || 0),
                 quantity: i.quantity || 0,
                 discount: 0,
-                gst: Number(selectedUnit.gst || 0)
+                gst: Number(first.gst || 0)
               })
             }
           : i
@@ -177,6 +178,7 @@ export default function SalesDashboard() {
   const [currentDateTime, setCurrentDateTime] = useState('');
   const [userName, setUserName] = useState('Loading...');
 
+  // ---------- FIXED ----------
   const token = localStorage.getItem('authToken');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const cid = user.cid;
@@ -423,7 +425,7 @@ export default function SalesDashboard() {
   };
 
   // -----------------------------------------------------------------
-  // Add Sale – with `dis`, `p_price`, and proper `name`
+  // Add Sale – with `dis` fix
   // -----------------------------------------------------------------
   const handleAddSale = async e => {
     e.preventDefault();
@@ -435,7 +437,7 @@ export default function SalesDashboard() {
 
     const formattedDate = new Date(dateInput).toISOString().slice(0, 19).replace('T', ' ');
     const displayDate = dateInput.slice(0, 16).replace('T', ' ');
-    const nameWithDate = rawName ? `${rawName} ${displayDate}` : `Sale Bill ${displayDate}`;
+    const nameWithDate = rawName ? `${rawName} ${displayDate}` : formattedDate;
 
     const itemsWithTotal = saleItems.map(i => ({
       ...i,
@@ -455,9 +457,8 @@ export default function SalesDashboard() {
         quantity: parseFloat(i.quantity.toFixed(3)),
         unit_id: i.unit_id,
         s_price: parseFloat(i.cost.toFixed(2)),
-        p_price: 0,  // REQUIRED FIELD
         discount: i.discount,
-        dis: i.discount,
+        dis: i.discount,          // <-- BACKEND FIX
         gst: parseFloat(i.gst.toFixed(2))
       }))
     };
@@ -468,7 +469,7 @@ export default function SalesDashboard() {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
-          'Accept': 'application/json'  // Fixed typo
+          Accept: 'application/json'
         },
         body: JSON.stringify(payload)
       });
@@ -507,11 +508,12 @@ export default function SalesDashboard() {
       setEditOriginalPaid(parseFloat(data.paid_amount) || 0);
       setSelectedCustomer({ id: data.customer_id, name: data.customer_name });
 
-      const nameParts = (data.bill_name || '').trim().split(' ');
-      const billName = nameParts.length > 5 ? nameParts.slice(0, -5).join(' ').trim() : nameParts.join(' ').trim();
+      const nameParts = (data.bill_name || '').split(' ');
+      const possibleDate = nameParts.slice(-5).join(' ');
+      const nameWithoutDate = nameParts.slice(0, -5).join(' ') || '';
 
       setEditForm({
-        nameWithDate: billName,
+        nameWithDate: nameWithoutDate,
         dateTime: data.date.slice(0, 16).replace(' ', 'T'),
         paymentMode: reversePaymentModeMap[data.payment_mode] || 'cash',
         absoluteDiscount: parseFloat(data.absolute_discount) || 0,
@@ -526,7 +528,6 @@ export default function SalesDashboard() {
           product_name: p.product_name,
           quantity: parseFloat(p.quantity) || 0,
           unit_id: p.unit_id,
-          unit_name: p.unit_name,
           discount: parseFloat(p.discount) || 0,
           gst: parseFloat(p.gst) || 0,
           cost: parseFloat(p.s_price) || 0,
@@ -541,14 +542,13 @@ export default function SalesDashboard() {
         items.forEach(itm => {
           const inp = document.getElementById(`edit-sale-product-input-${itm.id}`);
           if (inp) {
-            inp.value = itm.product_name || '';
             const ref = { current: inp };
             autocompleteRefs.current[itm.id] = ref;
             setupAutocomplete(itm.id, ref, true, setEditSaleItems);
 
             const row = inp.closest('tr');
             if (row && itm.product_id) {
-              handleProductSelection(row, itm.product_id, true, setEditSaleItems, itm.id, showToast, itm.unit_id);
+              handleProductSelection(row, itm.product_id, true, setEditSaleItems, itm.id, showToast);
             }
           }
         });
@@ -581,8 +581,8 @@ export default function SalesDashboard() {
           p_price: 0,
           s_price: parseFloat(cost.toFixed(2)),
           unit_id: parseInt(p.unit_id, 10),
-          discount: dis,
-          dis: dis,
+          discount: dis,     // optional (frontend)
+          dis: dis,          // <-- REQUIRED (backend)
           gst: gst
         };
       });
@@ -593,13 +593,13 @@ export default function SalesDashboard() {
     const dateInput = editForm.dateTime || new Date().toISOString().slice(0, 16);
     const displayDate = dateInput.slice(0, 16).replace('T', ' ');
     const formattedDate = `${dateInput.replace('T', ' ')}:00`;
-    const nameWithDate = rawName ? `${rawName} ${displayDate}` : `Sale ${displayDate}`;
+    const nameWithDate = rawName ? `${rawName} ${displayDate}` : formattedDate;
 
     const payload = {
       name: nameWithDate,
       payment_mode: paymentModeMap[editForm.paymentMode] || 3,
       customer_id: selectedCustomer?.id,
-      absolute_discount: parseFloat(editForm.absoluteDiscount) || 0,
+      absolute_discount: parseFloat(editForm.absoluteDiscount) || 0,   // <-- FIXED
       set_paid_amount: parseFloat(editForm.setPaidAmount) || 0,
       updated_at: formattedDate,
       gst: 0,
@@ -612,7 +612,7 @@ export default function SalesDashboard() {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
-          'Accept': 'application/json'  // Fixed typo
+          Accept: 'application/json'
         },
         body: JSON.stringify(payload)
       });
@@ -683,20 +683,6 @@ export default function SalesDashboard() {
     });
     setCustomers(filtered);
   };
-
-  // -----------------------------------------------------------------
-  // Sync product name in edit
-  // -----------------------------------------------------------------
-  useEffect(() => {
-    if (showEditSale) {
-      editSaleItems.forEach(itm => {
-        const inp = document.getElementById(`edit-sale-product-input-${itm.id}`);
-        if (inp && inp.value !== itm.product_name) {
-          inp.value = itm.product_name || '';
-        }
-      });
-    }
-  }, [editSaleItems, showEditSale]);
 
   // -----------------------------------------------------------------
   // Render
@@ -916,12 +902,7 @@ export default function SalesDashboard() {
 
             <div className="p-4 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <input 
-                  value={editForm.nameWithDate} 
-                  onChange={e => setEditForm(p => ({ ...p, nameWithDate: e.target.value }))} 
-                  placeholder="Bill Name" 
-                  className="px-3 py-2 border rounded" 
-                />
+                <input value={editForm.nameWithDate} onChange={e => setEditForm(p => ({ ...p, nameWithDate: e.target.value }))} placeholder="Bill Name (date will be appended)" className="px-3 py-2 border rounded" />
                 <input value={selectedCustomer?.name || ''} readOnly className="px-3 py-2 border rounded bg-gray-50" />
                 <input type="datetime-local" value={editForm.dateTime} onChange={e => setEditForm(p => ({ ...p, dateTime: e.target.value }))} className="px-3 py-2 border rounded" />
               </div>
@@ -944,14 +925,7 @@ export default function SalesDashboard() {
                     {editSaleItems.map(item => (
                       <tr key={`edit-sale-item-${item.id}`} data-row-id={item.id}>
                         <td className="p-1 relative">
-                          <input 
-                            id={`edit-sale-product-input-${item.id}`} 
-                            type="text" 
-                            placeholder="Search product..." 
-                            value={item.product_name || ''} 
-                            onChange={e => setEditSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, product_name: e.target.value } : i))}
-                            className="w-full p-1 border rounded text-sm" 
-                          />
+                          <input id={`edit-sale-product-input-${item.id}`} type="text" placeholder="Search product..." value={item.product_name || ''} onChange={e => setEditSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, product_name: e.target.value } : i))} className="w-full p-1 border rounded text-sm" />
                           <input type="hidden" id={`edit-sale-product-id-${item.id}`} value={item.product_id} />
                           <div id={`edit-sale-suggestions-${item.id}`} className="absolute z-10 bg-white border rounded mt-1 max-h-32 overflow-y-auto w-full hidden"></div>
                         </td>
@@ -959,7 +933,7 @@ export default function SalesDashboard() {
                         <td className="p-1"><select className="sale-unit w-full p-1 border rounded text-sm" value={item.unit_id} onChange={e => setEditSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, unit_id: e.target.value } : i))}><option value="">Select Unit</option></select></td>
                         <td className="p-1"><input type="number" className="sale-discount w-16 p-1 border rounded" value={item.discount} onChange={e => setEditSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, discount: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, discount: parseFloat(e.target.value) || 0 }) } : i))} /></td>
                         <td className="p-1"><input type="number" className="sale-gst w-16 p-1 border rounded" value={item.gst} onChange={e => setEditSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, gst: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, gst: parseFloat(e.target.value) || 0 }) } : i))} /></td>
-                        <td className="p-1"><input type="number" step="0.01" className="sale-cost w-full p-1 border rounded" value={item.cost} onChange={e => setEditSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, cost: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, cost: parseFloat(e.target.value) || 0 }) } : i))} /></td>
+                        <td className="p-1"><input type="number" step="0.01" className="sale-cost w-full p-1 border rounded" value={item.cost} onChange={ e => setEditSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, cost: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, cost: parseFloat(e.target.value) || 0 }) } : i))} /></td>
                         <td className="p-1 text-right">{currency}{item.total.toFixed(2)}</td>
                         <td className="p-1 text-center"><button type="button" onClick={() => removeItem(item.id, true)} className="text-red-600"><X className="w-4 h-4" /></button></td>
                       </tr>
@@ -968,31 +942,16 @@ export default function SalesDashboard() {
                 </table>
               </div>
 
-              {/* Add Item + Calculate (Right Bottom) */}
-              <div className="flex justify-between items-center mb-4">
-                <button type="button" onClick={() => addItemRow(true)} className="text-cyan-600 text-sm font-medium hover:text-cyan-700">
-                  + Add Item
-                </button>
-                <button type="button" onClick={() => setEditSaleItems(prev => prev.map(i => ({ ...i, total: calcRowTotal(i) })))} className="bg-yellow-500 text-white px-4 py-2 rounded text-sm flex items-center gap-1 shadow-md hover:bg-yellow-600">
-                  <Calculator className="w-5 h-5" /> Calculate
-                </button>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => addItemRow(true)} className="text-cyan-600 text-sm">+ Add Item</button>
+                <button type="button" onClick={() => setEditSaleItems(prev => prev.map(i => ({ ...i, total: calcRowTotal(i) })))} className="bg-yellow-500 text-white px-3 py-1 rounded text-sm flex items-center gap-1"><Calculator className="w-4 h-4" /> Calculate</button>
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
                 <div><strong>Subtotal:</strong> {currency}{editTotals.subtotal}</div>
-
-                <div>
-                  <label className="block font-medium text-gray-700 mb-1">Abs. Discount</label>
-                  <input type="number" step="0.01" value={editForm.absoluteDiscount} onChange={e => setEditForm(p => ({ ...p, absoluteDiscount: parseFloat(e.target.value) || 0 }))} className="w-full p-2 border rounded" />
-                </div>
-
+                <input type="number" step="0.01" value={editForm.absoluteDiscount} onChange={e => setEditForm(p => ({ ...p, absoluteDiscount: parseFloat(e.target.value) || 0 }))} placeholder="Abs. Discount" className="p-2 border rounded" />
                 <div><strong>Payable:</strong> {currency}{editTotals.payable}</div>
-
-                <div>
-                  <label className="block font-medium text-gray-700 mb-1">Paid</label>
-                  <input type="number" step="0.01" value={editForm.setPaidAmount} onChange={e => setEditForm(p => ({ ...p, setPaidAmount: parseFloat(e.target.value) || 0 }))} className="w-full p-2 border rounded" />
-                </div>
-
+                <input type="number" step="0.01" value={editForm.setPaidAmount} onChange={e => setEditForm(p => ({ ...p, setPaidAmount: parseFloat(e.target.value) || 0 }))} placeholder="Paid Adj." className="p-2 border rounded" />
                 <div><strong>Due:</strong> {currency}{editTotals.due}</div>
               </div>
 
@@ -1090,7 +1049,7 @@ export default function SalesDashboard() {
                             </div>
                           </td>
 
-                          <td className="p-1"><input type="number" step="0.01" value={item.quantity} onChange={e => setSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, quantity: parseFloat(e.target.value) || 0 }) } : i))} className="w-16 p-1 border rounded text-sm sale-quantity" /></td>
+                          <td className="p-1"><input type="number" step="0.01" className="w-16 p-1 border rounded text-sm sale-quantity" value={item.quantity} onChange={e => setSaleItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity: parseFloat(e.target.value) || 0, total: calcRowTotal({ ...i, quantity: parseFloat(e.target.value) || 0 }) } : i))} /></td>
 
                           <td className="p-1"><select className="sale-unit w-full p-1 border rounded text-sm"><option value="" disabled selected>Select Unit</option></select></td>
 
@@ -1108,14 +1067,9 @@ export default function SalesDashboard() {
                     </tbody>
                   </table>
 
-                  {/* Add Item + Calculate (Right Bottom) */}
-                  <div className="flex justify-between items-center mt-2">
-                    <button type="button" onClick={() => addItemRow()} className="text-cyan-600 text-sm font-medium hover:text-cyan-700">
-                      + Add Item
-                    </button>
-                    <button type="button" onClick={() => setSaleItems(prev => prev.map(i => ({ ...i, total: calcRowTotal(i) })))} className="bg-yellow-500 text-white px-4 py-2 rounded text-sm flex items-center gap-1 shadow-md hover:bg-yellow-600">
-                      <Calculator className="w-5 h-5" /> Calculate
-                    </button>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => addItemRow()} className="text-cyan-600 text-sm">+ Add Item</button>
+                    <button type="button" onClick={() => setSaleItems(prev => prev.map(i => ({ ...i, total: calcRowTotal(i) })))} className="bg-yellow-500 text-white px-3 py-1 rounded text-sm flex items-center gap-1"><Calculator className="w-4 h-4" /> Calculate</button>
                   </div>
                 </div>
 
