@@ -227,6 +227,9 @@ export default function Admin() {
   };
 
   return (
+    <>
+          <Navbar />
+
     <div className="p-2">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-24">
         <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
@@ -489,6 +492,10 @@ export default function Admin() {
           </div>
         ))}
       </div>
+      
     </div>
+        </>
+
+    
   );
 }
